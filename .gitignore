@@ -1,0 +1,11 @@
+*.retry
+logs/*.log
+**/packer_cache/
+*.box
+*.qcow2
+images/
+vagrant_boxes/
+*/http/preseed.cfg
+.vscode
+commit_version
+.vagrant
