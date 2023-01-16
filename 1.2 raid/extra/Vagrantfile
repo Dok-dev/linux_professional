@@ -1,0 +1,64 @@
+# -*- mode: ruby -*-
+# vim: set ft=ruby :
+
+MACHINES = {
+  :linuxnodes => {
+        :box_name => "generic/centos7",
+        :ip_addr => '192.168.60.10',
+        :disks => {
+                :sata1 => {
+                    :dfile => './sata1.vdi',
+                    :size => 150000, # Megabytes
+                    :port => 1
+                },
+                :sata2 => {
+                    :dfile => './sata2.vdi',
+                    :size => 150000,
+                    :port => 2
+                }
+        }
+
+    },
+}
+
+Vagrant.configure("2") do |config|
+    MACHINES.each do |boxname, boxconfig|
+        config.vm.define boxname do |box|
+            box.vm.box = boxconfig[:box_name]
+            box.vm.host_name = boxname.to_s
+            #box.vm.network "forwarded_port", guest: 3260, host: 3260+offset
+            box.vm.network "private_network", ip: boxconfig[:ip_addr]
+            box.vm.provider :virtualbox do |vb|
+                vb.customize ["modifyvm", :id, "--memory", "1024"]
+
+                # vb.customize ["storagectl", :id, "--name", "SATA", "--add", "sata" ]
+                boxconfig[:disks].each do |dname, dconf|
+                    unless File.exist?(dconf[:dfile])
+                        vb.customize ['createhd', '--filename', dconf[:dfile], '--variant', 'Fixed', '--size', dconf[:size]]
+                    end
+                    # Don not foget check correct controller names for VBox version `VBoxManage list vms -l | grep -i storage`
+                    vb.customize ['storageattach', :id,  '--storagectl', 'SATA Controller', '--port', dconf[:port], '--device', 0, '--type', 'hdd', '--medium', dconf[:dfile]]
+                end
+
+            end
+            box.vm.provision "shell", inline: <<-SHELL
+                mkdir -p ~root/.ssh
+                cp ~vagrant/.ssh/auth* ~root/.ssh
+                yum install -y mdadm smartmontools hdparm gdisk
+                mdadm --create --verbose --metadata=0.90 /dev/md0 -l 1 -n 2 /dev/sd{b,c}
+                mkdir /etc/mdadm
+                echo "DEVICE partitions" > /etc/mdadm/mdadm.conf
+                mdadm --detail --scan --verbose | awk '/ARRAY/ {print}' >> /etc/mdadm/mdadm.conf
+                parted -s /dev/md0 mklabel gpt
+                parted /dev/md0 mkpart primary ext4 1049kb 1075MB
+                parted /dev/md0 mkpart primary ext4 1075MB 137GB
+                
+                mkfs.ext4 /dev/md0p1
+                mkdir -p /raid/part1
+                mount /dev/md0p1 /raid/part1
+
+            SHELL
+
+        end
+    end
+end
