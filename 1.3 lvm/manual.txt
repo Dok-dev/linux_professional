@@ -1,0 +1,378 @@
+Для начала необходимо определиться какие устройства мы хотим использовать в  качестве Physical Volumes (далее - PV) для наших будущих Volume Groups (далее - VG). Для  этого можно воспользоваться lsblk: 
+[root@otuslinux ~]# lsblk 
+NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINT 
+sda 8:0 0 40G 0 disk 
+|-sda1 8:1 0 1M 0 part 
+|-sda2 8:2 0 1G 0 part /boot 
+`-sda3 8:3 0 39G 0 part 
+ |-VolGroup00-LogVol00 253:0 0 37.5G 0 lvm / 
+ `-VolGroup00-LogVol01 253:1 0 1.5G 0 lvm [SWAP] 
+sdb 8:16 0 10G 0 disk 
+sdc 8:32 0 2G 0 disk 
+sdd 8:48 0 1G 0 disk 
+sde 8:64 0 1G 0 disk 
+На выделенных дисках будем экспериментировать. Диски sdb, sdc будем использовать  для базовых вещей и снапшотов. На дисках sdd,sde создадим lvm mirror.
+  Также можно воспользоваться утилитой lvmdiskscan: 
+[root@otuslinux ~]# lvmdiskscan 
+ /dev/VolGroup00/LogVol00 [ <37.47 GiB] 
+ /dev/VolGroup00/LogVol01 [ 1.50 GiB] 
+ /dev/sda2 [ 1.00 GiB] 
+ /dev/sda3 [ <39.00 GiB] LVM physical volume  /dev/sdb [ 10.00 GiB] 
+ /dev/sdc [ 2.00 GiB] 
+ /dev/sdd [ 1.00 GiB] 
+ /dev/sde [ 1.00 GiB] 
+ 4 disks 
+ 3 partitions 
+ 0 LVM physical volume whole disks 
+ 1 LVM physical volume
+  
+Для начала разметим диск для будущего использования LVM - создадим PV: 
+[root@otuslinux ~]# pvcreate /dev/sdb 
+Physical volume "/dev/sdb" successfully created. 
+Затем можно создавать первый уровень абстракции - VG: 
+[root@otuslinux ~]# vgcreate otus /dev/sdb 
+Volume group "otus" successfully created 
+И в итоге создать Logical Volume (далее - LV): 
+[root@otuslinux ~]# lvcreate -l+80%FREE -n test otus 
+Logical volume "test" created.
+  
+Посмотреть информация о только что созданном Volume Group: 
+[root@otuslinux ~]# vgdisplay otus 
+ VG Name otus 
+ System ID 
+ Format lvm2 
+ Metadata Areas 1 
+ Metadata Sequence No 2 
+ VG Access read/write 
+ VG Status resizable 
+ VG Size <10.00 GiB 
+ PE Size 4.00 MiB 
+ Total PE 2559 
+ Alloc PE / Size 2047 / <8.00 GiB 
+ Free PE / Size 512 / 2.00 GiB 
+ VG UUID LLPnLk-31Zu-g5pr-sfCl-MO4u-ywTO-Dc4D72
+  
+Так, например, можно посмотреть информация о том, какие диски входит в VG: 
+[root@otuslinux ~]# vgdisplay -v otus | grep 'PV NAME' 
+ PV Name /dev/sdb 
+На примере с расширением VG мы увидим, что сяда добавится еще один диск.
+  
+Детальнуя информация о LV получим командой: 
+[root@otuslinux ~]# lvdisplay /dev/otus/test 
+ --- Logical volume --- 
+ LV Path /dev/otus/test 
+ LV Name test 
+ VG Name otus 
+ LV UUID BJDAho-oAsa-QCmx-D7Aq-CZit-ueqi-KJwCZx  LV Write Access read/write 
+ LV Creation host, time otuslinux, 2018-10-29 09:41:55 +0000  LV Status available 
+ # open 0 
+ LV Size <8.00 GiB 
+ Current LE 2047 
+ Segments 1 
+ Allocation inherit 
+ Read ahead sectors auto 
+ - currently set to 8192 
+ Block device 253:2
+  
+В сжатом виде информация можно получить командами vgs и lvs: 
+[root@otuslinux ~]# vgs 
+ VG #PV #LV #SN Attr VSize VFree 
+ VolGroup00 1 2 0 wz--n- <38.97g 0 
+ otus 1 1 0 wz--n- <10.00g 2.00g 
+[root@otuslinux ~]# lvs 
+ LV VG Attr LSize Pool Origin Data% Meta% Move Log Cpy%Sync Convert  LogVol00 VolGroup00 -wi-ao---- <37.47g  
+ LogVol01 VolGroup00 -wi-ao---- 1.50g  
+ test otus -wi-a----- <8.00g
+  
+Мы можем создать еще один LV из свободного места. На этот раз создадим не  экстентами, а абсолятным значением в мегабайтах: 
+[root@otuslinux ~]# lvcreate -L100M -n small otus 
+ Logical volume "small" created. 
+[root@otuslinux ~]# lvs 
+ LV VG Attr LSize Pool Origin Data% Meta% Move Log Cpy%Sync Convert  LogVol00 VolGroup00 -wi-ao---- <37.47g  
+ LogVol01 VolGroup00 -wi-ao---- 1.50g  
+ small otus -wi-a----- 100.00m  
+ test otus -wi-a----- <8.00g
+  
+Создадим на LV файловуя систему и смонтируем его 
+[root@otuslinux ~]# mkfs.ext4 /dev/otus/test 
+... 
+Allocating group tables: done 
+Writing inode tables: done 
+Creating journal (4096 blocks): done 
+Writing superblocks and filesystem accounting information: done ьлвшк .вфеф
+[root@otuslinux ~]# mkdir /data 
+[root@otuslinux ~]# mount /dev/otus/test /data/ 
+[root@otuslinux ~]# mount | grep /data 
+/dev/mapper/otus-test on /data type ext4 (rw,relatime,seclabel,data=ordered)
+LVM Resizing
+Расширение LVM 
+Допустим перед нами встала проблема нехватки свободного места в директории /data. Мы  можем расширить файловую систему на LV /dev/otus/test за счет нового блочного устройства  /dev/sdc. 
+Для начала так же необходимо создать PV: 
+[root@otuslinux ~]# pvcreate /dev/sdc 
+ Physical volume "/dev/sdc" successfully created. 
+Далее необходимо расширить VG добавив в него этот диск 
+[root@otuslinux ~]# vgextend otus /dev/sdc 
+ Volume group "otus" successfully extended 
+Убедимся что новый диск присутствует в новой VG:  
+[root@otuslinux ~]# vgdisplay -v otus | grep 'PV Name' 
+ PV Name /dev/sdb 
+ PV Name /dev/sdc
+Расширение LVM 
+Убедимся что диск добавлен: 
+[root@otuslinux ~]# vgdisplay -v otus | grep 'PV Name'  PV Name /dev/sdb 
+ PV Name /dev/sdc 
+И что места в VG прибавилось: 
+[root@otuslinux ~]# vgs 
+ VG #PV #LV #SN Attr VSize VFree  VolGroup00 1 2 0 wz--n- <38.97g 0  otus 2 2 0 wz--n- 11.99g <3.90g
+Расширение LVM 
+Сымитируем занятое место с помощья команды dd для большей наглядности: 
+[root@otuslinux ~]# dd if=/dev/zero of=/data/test.log bs=1M count=8000 status=progress 8109686784 bytes (8.1 GB) copied, 71.962229 s, 113 MB/s 
+dd: error writing '/data/test.log': No space left on device 
+7880+0 records in 
+7879+0 records out 
+8262189056 bytes (8.3 GB) copied, 72.4518 s, 114 MB/s 
+Теперь у нас занято 100% дискового пространства: 
+[root@otuslinux ~]# df -Th /data/ 
+Filesystem Type Size Used Avail Use% Mounted on 
+/dev/mapper/otus-test ext4 7.8G 7.8G 0 100% /data
+Расширение LVM 
+Увеличиваем LV за счет появившегося свободного места. Возьмем не все место - это для того,  чтобы осталось место для демонстрации снапшотов: 
+[root@otuslinux ~]# lvextend -l+80%FREE /dev/otus/test 
+ Size of logical volume otus/test changed from 8.00 GiB (2072 extents) to <11.14 GiB (2851 extents).  Logical volume otus/test successfully resized. 
+Наблядаем что LV расширен до 11.14g: 
+[root@otuslinux ~]# lvs /dev/otus/test 
+ LV VG Attr LSize Pool Origin Data% Meta% Move Log Cpy%Sync Convert  test otus -wi-ao---- <11.14g 
+Расширение LVM 
+Но файловая система при этом осталась прежнего размера: 
+[root@otuslinux ~]# df -Th /data 
+Filesystem Type Size Used Avail Use% Mounted on /dev/mapper/otus-test ext4 7.8G 7.8G 0 100% /data 
+Произведем resize файловой системы: 
+[root@otuslinux ~]# resize2fs /dev/otus/test 
+resize2fs 1.42.9 (28-Dec-2013) 
+Filesystem at /dev/otus/test is mounted on /data; on-line resizing required old_desc_blocks = 1, new_desc_blocks = 2 
+The filesystem on /dev/otus/test is now 2919424 blocks long. 
+[root@otuslinux ~]# df -Th /data 
+Filesystem Type Size Used Avail Use% Mounted on /dev/mapper/otus-test ext4 11G 7.8G 2.6G 76% /data
+Уменьшение LV 
+Допустим Вы забыли оставить место на снапшоты. Можно уменьшить существуящий LV с  помощья команды lvreduce, но перед этим необходимо отмонтировать файловуя систему,  проверить её на ошибки и уменьшить ее размер: 
+[root@otuslinux ~]# umount /data/ 
+[root@otuslinux ~]# e2fsck -fy /dev/otus/test 
+e2fsck 1.42.9 (28-Dec-2013) 
+Pass 1: Checking inodes, blocks, and sizes 
+Pass 2: Checking directory structure 
+Pass 3: Checking directory connectivity 
+Pass 4: Checking reference counts 
+Pass 5: Checking group summary information 
+/dev/otus/test: 12/737280 files (0.0% non-contiguous), 2106421/2934784 blocks 
+[root@otuslinux ~]# resize2fs /dev/otus/test 10G 
+resize2fs 1.42.9 (28-Dec-2013) 
+Resizing the filesystem on /dev/otus/test to 2621440 (4k) blocks. 
+The filesystem on /dev/otus/test is now 2621440 blocks long.
+Уменьшение LV 
+[root@otuslinux ~]# lvreduce /dev/otus/test -L 10G 
+ WARNING: Reducing active logical volume to 10.00 GiB. 
+ THIS MAY DESTROY YOUR DATA (filesystem etc.) 
+Do you really want to reduce otus/test? [y/n]: y 
+ Size of logical volume otus/test changed from <11.20 GiB (2866 extents) to 10.00 GiB (2560  extents). 
+ Logical volume otus/test successfully resized. 
+[root@otuslinux ~]# mount /dev/otus/test /data/ 
+Убедимся, что ФС и lvm необходимого размера: 
+[root@otuslinux ~]# df -Th /data/ 
+Filesystem Type Size Used Avail Use% Mounted on 
+/dev/mapper/otus-test ext4 9.8G 7.8G 1.6G 84% /data 
+[root@otuslinux ~]# lvs /dev/otus/test 
+ LV VG Attr LSize Pool Origin Data% Meta% Move Log Cpy%Sync Convert  test otus -wi-ao---- 10.00g
+LVM Snapshot
+LVM Snapshot 
+Снапшот создается командой lvcreate, только с флагом -s, который указывает на то, что это  снимок: 
+[root@otuslinux ~]# lvcreate -L 500M -s -n test-snap /dev/otus/test 
+ Logical volume "test-snap" created. 
+Проверим с помощья vgs: 
+[root@otuslinux ~]# sudo vgs -o +lv_size,lv_name | grep test 
+ otus 2 3 1 wz--n- 11.99g <1.41g 10.00g test 
+ otus 2 3 1 wz--n- 11.99g <1.41g 500.00m test-snap
+LVM Snapshot 
+Команда lsblk, например, нам наглядно покажет, что произошло: 
+[root@otuslinux ~]# lsblk 
+... 
+sdb 8:16 0 10G 0 disk 
+|-otus-small 253:3 0 100M 0 lvm  
+`-otus-test-real 253:4 0 10G 0 lvm  
+ |-otus-test 253:2 0 10G 0 lvm /data 
+ `-otus-test--snap 253:6 0 10G 0 lvm /data-snap sdc 8:32 0 2G 0 disk 
+
+|-otus-test-real 253:4 0 10G 0 lvm  | |-otus-test 253:2 0 10G 0 lvm /data 
+Оригинальный LV 
+
+| `-otus-test--snap 253:6 0 10G 0 lvm /data-snap `-otus-test--snap-cow 253:5 0 500M 0 lvm   `-otus-test--snap 253:6 0 10G 0 lvm /data-snap 
+Снапшот
+Copy-on-Write. Сяда пишутся все изменения 
+
+LVM Snapshot
+Снапшот можно смонтировать как и лябой другой LV: [root@otuslinux]# mkdir /data-snap 
+[root@otuslinux data]# mount /dev/otus/test-snap /data-snap/ 
+[root@otuslinux data]# ll /data-snap/ 
+total 8192020 
+drwx------. 2 root root 16384 Oct 29 10:48 lost+found -rw-r--r--. 1 root root 8388608000 Oct 29 10:59 test.log 
+[root@otuslinux data]# unmount /data-snap 
+LVM Snapshot
+Можно также восстановить предыдущее состояние. “Откатиться” на снапшот. Для этого  сначала для большей наглядности удалим наш log файл: 
+[root@otuslinux ~]# rm test.log 
+rm: remove regular file 'test.log'? y 
+[root@otuslinux ~]# ll 
+total 16 
+drwx------. 2 root root 16384 Oct 29 10:48 lost+found 
+[root@otuslinux ~]# umount /data 
+[root@otuslinux ~]# lvconvert --merge /dev/otus/test-snap 
+ Merging of volume otus/test-snap started. 
+ otus/test: Merged: 100.00% 
+[root@otuslinux ~]# mount /dev/otus/test /data 
+[root@otuslinux ~]# ll /data 
+total 8192020 
+drwx------. 2 root root 16384 Oct 29 10:48 lost+found 
+-rw-r--r--. 1 root root 8388608000 Oct 29 10:59 test.log 
+LVM Mirroring
+Работа с lvm 
+[root@otuslinux ~]# pvcreate /dev/sd{d,e} 
+ Physical volume "/dev/sdd" successfully created. 
+ Physical volume "/dev/sde" successfully created. 
+[root@otuslinux ~]# vgcreate vg0 /dev/sd{d,e} 
+ Volume group "vg0" successfully created 
+[root@otuslinux ~]# lvcreate -l+80%FREE -m1 -n mirror vg0 
+ Logical volume "mirror" created. 
+[root@otuslinux ~]# lvs 
+ LV VG Attr LSize Pool Origin Data% Meta% Move Log Cpy%Sync Convert  mirror vg0 rwi-a-r--- 816.00m 100.00
+Домашнее задание
+Домашнее задание 
+На имеящемся образе centos/7 - v. 1804.2 
+1) Уменьшить том под / до 8G 
+2) Выделить том под /home 
+3) Выделить том под /var - сделать в mirror 
+4) /home - сделать том для снапшотов 
+5) Прописать монтирование в fstab. Попробовать с разными опциями и разными  файловыми системами ( на выбор) 
+Работа со снапшотами: 
+- сгенерить файлы в /home/ 
+- снять снапшот 
+- удалить часть файлов 
+- восстановится со снапшота 
+- залоггировать работу можно с помощья утилиты script 
+* на нашей куче дисков попробовать поставить btrfs/zfs - с кешем, снапшотами - разметить  здесь каталог /opt
+Уменьшить том под / до 8G 
+Эту часть можно выполнить разными способами, в данном примере мы будем  уменьшать / до 8G без использования LiveCD. 
+Если вы оставили том /dev/sdb из прошлых примеров заполненным, очистите его. 
+Перед началом работы поставьте пакет xfsdump - он будет необходим для снятия копии  / тома.
+Уменьшить том под / до 8G 
+Подготовим временный том для / раздела: 
+[root@otuslinux ~]# pvcreate /dev/sdb 
+ Physical volume "/dev/sdb" successfully created. 
+[root@otuslinux ~]# vgcreate vg_root /dev/sdb 
+ Volume group "vg_root" successfully created 
+[root@otuslinux ~]# lvcreate -n lv_root -l +100%FREE /dev/vg_root 
+ Logical volume "lv_root" created. 
+Создадим на нем файловуя систему и смонтируем его, чтобы перенести туда данные: 
+[root@otuslinux ~]# mkfs.xfs /dev/vg_root/lv_root 
+[root@otuslinux ~]# mount /dev/vg_root/lv_root /mnt
+Уменьшить том под / до 8G 
+Этой командой скопируем все данные с / раздела в /mnt: 
+[root@otuslinux ~]# xfsdump -J - /dev/VolGroup00/LogVol00 | xfsrestore -J - /mnt xfsrestore: Restore Status: SUCCESS 
+Тут выхлоп большой, но в итоге вы должны увидеть SUCCESS. Проверить что скопировалось  можно командой ls /mnt
+Уменьшить том под / до 8G 
+Затем переконфигурируем grub для того, чтобы при старте перейти в новый / Сымитируем текущий root -> сделаем в него chroot и обновим grub: 
+[root@otuslinux ~]# for i in /proc/ /sys/ /dev/ /run/ /boot/; do mount --bind $i /mnt/$i; done [root@otuslinux ~]# chroot /mnt/ 
+[root@otuslinux ~]# grub2-mkconfig -o /boot/grub2/grub.cfg 
+Generating grub configuration file ... 
+Found linux image: /boot/vmlinuz-3.10.0-862.2.3.el7.x86_64 
+Found initrd image: /boot/initramfs-3.10.0-862.2.3.el7.x86_64.img 
+done
+Уменьшить том под / до 8G 
+Обновим образ initrd. Что это такое и зачем нужно вы узнаете из след. лекции. 
+[root@otuslinux ~]# cd /boot ; for i in `ls initramfs-*img`; do dracut -v $i `echo $i|sed "s/initramfs-//g;  s/.img//g"` --force; done 
+*** Creating image file *** 
+*** Creating image file done *** 
+*** Creating initramfs image file '/boot/initramfs-3.10.0-862.2.3.el7.x86_64.img' done *** 
+Ну и для того, чтобы при загрузке был смонтирован нужны root нужно в файле  /boot/grub2/grub.cfg заменить rd.lvm.lv=VolGroup00/LogVol00 на rd.lvm.lv=vg_root/lv_root
+Уменьшить том под / до 8G 
+Перезагружаемся успешно с новым рут томом. Убедиться в этом можно посмотрев вывод  lsblk: 
+[root@otuslinux ~]# lsblk 
+NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINT 
+sda 8:0 0 40G 0 disk 
+|-sda1 8:1 0 1M 0 part 
+|-sda2 8:2 0 1G 0 part /boot 
+`-sda3 8:3 0 39G 0 part 
+ |-VolGroup00-LogVol01 253:1 0 1.5G 0 lvm [SWAP] 
+ `-VolGroup00-LogVol00 253:2 0 37.5G 0 lvm  
+sdb 8:16 0 10G 0 disk 
+`-vg_root-lv_root 253:0 0 10G 0 lvm /  
+sdc 8:32 0 2G 0 disk 
+sdd 8:48 0 1G 0 disk 
+sde 8:64 0 1G 0 disk
+Уменьшить том под / до 8G 
+Теперь нам нужно изменить размер старой VG и вернуть на него рут. Для этого удаляем  старый LV размеров в 40G и создаем новый на 8G: 
+[root@otuslinux ~]# lvremove /dev/VolGroup00/LogVol00 
+Do you really want to remove active logical volume VolGroup00/LogVol00? [y/n]: y  Logical volume "LogVol00" successfully removed 
+[root@otuslinux ~]# lvcreate -n VolGroup00/LogVol00 -L 8G /dev/VolGroup00 WARNING: xfs signature detected on /dev/VolGroup00/LogVol00 at offset 0. Wipe it? [y/n]: y  Wiping xfs signature on /dev/VolGroup00/LogVol00. 
+ Logical volume "LogVol00" created.
+Уменьшить том под / до 8G 
+Проделываем на нем те же операции, что и в первый раз: 
+[root@otuslinux ~]# mkfs.xfs /dev/VolGroup00/LogVol00 [root@otuslinux ~]# mount /dev/VolGroup00/LogVol00 /mnt 
+[root@otuslinux ~]# xfsdump -J - /dev/vg_root/lv_root | xfsrestore -J - /mnt xfsdump: Dump Status: SUCCESS 
+xfsrestore: restore complete: 37 seconds elapsed 
+xfsrestore: Restore Status: SUCCESS
+Уменьшить том под / до 8G 
+Так же как в первый раз переконфигурируем grub, за исклячением правки /etc/grub2/grub.cfg 
+[root@otuslinux ~]# for i in /proc/ /sys/ /dev/ /run/ /boot/; do mount --bind $i /mnt/$i; done [root@otuslinux ~]# chroot /mnt/ 
+[root@otuslinux ~]# grub2-mkconfig -o /boot/grub2/grub.cfg 
+Generating grub configuration file ... 
+Found linux image: /boot/vmlinuz-3.10.0-862.2.3.el7.x86_64 
+Found initrd image: /boot/initramfs-3.10.0-862.2.3.el7.x86_64.img 
+done 
+[root@otuslinux ~]# cd /boot ; for i in `ls initramfs-*img`; do dracut -v $i `echo $i|sed "s/initramfs-//g;  s/.img//g"` --force; done 
+*** Creating image file *** 
+*** Creating image file done *** 
+*** Creating initramfs image file '/boot/initramfs-3.10.0-862.2.3.el7.x86_64.img' done *** Пока не перезагружаемся и не выходим из под chroot - мы можем заодно перенести /var
+Выделить том под /var в зеркало 
+На свободных дисках создаем зеркало: 
+[root@otuslinux ~]#pvcreate /dev/sdc /dev/sdd  Physical volume "/dev/sdc" successfully created.  Physical volume "/dev/sdd" successfully created. 
+[root@otuslinux ~]# vgcreate vg_var /dev/sdc /dev/sdd  Volume group "vg_var" successfully created 
+[root@otuslinux ~]# lvcreate -L 950M -m1 -n lv_var vg_var  Rounding up size to full physical extent 952.00 MiB  Logical volume "lv_var" created.
+Выделить том под /var в зеркало 
+Создаем на нем ФС и перемещаем туда /var: 
+[root@otuslinux ~]# mkfs.ext4 /dev/vg_var/lv_var 
+Writing superblocks and filesystem accounting information: done 
+[root@otuslinux ~]# mount /dev/vg_var/lv_var /mnt 
+[root@otuslinux ~]# cp -aR /var/* /mnt/ # rsync -avHPSAX /var/ /mnt/ 
+На всякий случай сохраняем содержимое старого var (или же можно его просто удалить): [root@otuslinux ~]# mkdir /tmp/oldvar && mv /var/* /tmp/oldvar 
+Ну и монтируем новый var в каталог /var: 
+[root@otuslinux ~]# umount /mnt 
+[root@otuslinux ~]# mount /dev/vg_var/lv_var /var 
+Правим fstab для автоматического монтирования /var: 
+[root@otuslinux ~]# echo "`blkid | grep var: | awk '{print $2}'` /var ext4 defaults 0 0" >> /etc/fstab
+Выделить том под /var 
+После чего можно успешно перезагружаться в новый (уменьшенный root) и удалять  временнуя Volume Group: 
+[root@otuslinux ~]# lvremove /dev/vg_root/lv_root 
+Do you really want to remove active logical volume vg_root/lv_root? [y/n]: y  Logical volume "lv_root" successfully removed 
+[root@otuslinux ~]# vgremove /dev/vg_root 
+ Volume group "vg_root" successfully removed 
+[root@otuslinux ~]# pvremove /dev/sdb 
+ Labels on physical volume "/dev/sdb" successfully wiped.
+Выделить том под /home 
+Выделяем том под /home по тому же принципу что делали для /var: 
+[root@otuslinux ~]# lvcreate -n LogVol_Home -L 2G /dev/VolGroup00 
+ Logical volume "LogVol_Home" created. 
+[root@otuslinux ~]# mkfs.xfs /dev/VolGroup00/LogVol_Home 
+[root@otuslinux ~]# mount /dev/VolGroup00/LogVol_Home /mnt/ 
+[root@otuslinux ~]# cp -aR /home/* /mnt/  
+[root@otuslinux ~]# rm -rf /home/* 
+[root@otuslinux ~]# umount /mnt 
+[root@otuslinux ~]# mount /dev/VolGroup00/LogVol_Home /home/ 
+Правим fstab для автоматического монтирования /home 
+[root@otuslinux ~]# echo "`blkid | grep Home | awk '{print $2}'` /home xfs defaults 0 0" >> /etc/fstab
+/home - сделать том для снапшотов 
+Сгенерируем файлы в /home/: 
+[root@otuslinux ~]# touch /home/file{1..20} 
+Снять снапшот: 
+[root@otuslinux ~]# lvcreate -L 100MB -s -n home_snap /dev/VolGroup00/LogVol_Home Удалить часть файлов: 
+[root@otuslinux ~]# rm -f /home/file{11..20} 
+Процесс восстановления со снапшота: 
+[root@otuslinux ~]# umount /home 
+[root@otuslinux ~]# lvconvert --merge /dev/VolGroup00/home_snap [root@otuslinux ~]# mount /home
