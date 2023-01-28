@@ -9,3 +9,4 @@ vagrant_boxes/
 .vscode
 commit_version
 .vagrant
+*.vdi
