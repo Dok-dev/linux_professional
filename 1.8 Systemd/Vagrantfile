@@ -1,0 +1,36 @@
+# If  you run VM on remote machine, virtualbox may fail with an error
+# This happens due to the enabled gui session in vbox,
+# in order to avoid the error, turn off the gui in the variable below
+$gui = true
+
+# Astra Linux SE version
+$astra_version = "1.7.3"
+
+# Set up ALSE 1.7 security level
+# 0 - Base security level Orel
+# 1 - Advanced security level Voronezh
+# 2 - Maximum security level Smolensk
+$sec_level = 0
+
+$image_sec_level = {
+    0 => "base",
+    1 => "adv",
+    3 => "max"
+}
+
+$setup_soft = <<SCRIPT
+#!/bin/bash
+SCRIPT
+
+Vagrant.configure("2") do |config|
+    config.vm.synced_folder ".", "/vagrant", id: "vagrant", automount: true
+    config.vm.box     = "generic/centos7"
+    #config.vm.box     = "alse-vanilla-gui-#{$image_sec_level[$sec_level]}/#{$astra_version}"
+    #config.vm.box_url = "https://artifactory.astralinux.ru/artifactory/api/vagrant/mg-vagrant/alse-vanilla-gui-#{$image_sec_level[$sec_level]}%2F#{$astra_version}"
+    config.vm.provider "virtualbox" do |vb|
+    #    vb.gui                = $gui
+        vb.cpus               = "2"
+        vb.memory             = "2048"
+    end
+    config.vm.provision "shell", inline: $setup_soft, keep_color: false
+end
