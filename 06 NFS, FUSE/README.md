@@ -1,4 +1,4 @@
-# Домашнее задание к занятию 1.5 "NFS, FUSE" - "Стенд Vagrant с NFS"
+# Домашнее задание к занятию 6 "NFS, FUSE" - "Стенд Vagrant с NFS"
 https://docs.google.com/document/d/1Xz7dCWSzaM8Q0VzBt78K3emh7zlNX3C-Q27B6UuVexI
 
 

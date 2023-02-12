@@ -1,4 +1,4 @@
-# Домашнее задание к занятию 1.2 "Работа с mdadm"
+# Домашнее задание к занятию 2 "Работа с mdadm"
 https://drive.google.com/file/d/1phsvBYkiRPVrDG0EXagy-TF4P5y9XOAX/view
 
 

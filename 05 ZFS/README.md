@@ -1,4 +1,4 @@
-# Домашнее задание к занятию 1.4 "Файловая система ZFS"
+# Домашнее задание к занятию 5 "Файловая система ZFS"
 https://docs.google.com/document/d/1umX2K8cv-aB7iLjzDpkREHhtE65W2fQDWpZHvvF5EjY/edit
 
 

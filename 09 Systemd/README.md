@@ -1,4 +1,4 @@
-# Домашнее задание к занятию 1.8 "Инициализация системы. Systemd. "
+# Домашнее задание к занятию 9 "Инициализация системы. Systemd. "
 https://drive.google.com/file/d/1yVi3sJjl9maOCN_Z6cUyPj4rzo0CpudR
 
 

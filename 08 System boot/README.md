@@ -1,4 +1,4 @@
-# Домашнее задание к занятию 1.7 "Работа с загрузчиком"
+# Домашнее задание к занятию 8 "Работа с загрузчиком"
 https://drive.google.com/file/d/1-lfwAa6hOC-HVF2Agz9tj21vtKFyjDq7/view?usp=share_link
 
 

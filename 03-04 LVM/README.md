@@ -1,4 +1,4 @@
-# Домашнее задание к занятию 1.3 "Работа с LVM"
+# Домашнее задание к занятиям 3 - 4 "Работа с LVM"
 https://drive.google.com/file/d/1phsvBYkiRPVrDG0EXagy-TF4P5y9XOAX/view
 
 
