@@ -1,0 +1,50 @@
+---
+####### For testing in vagrant ##########
+dependency:
+  name: galaxy
+driver:
+  name: vagrant
+  provider:
+    name: virtualbox
+# lint:
+#   name: yamllint
+platforms:
+  - name: instance
+    box: centos/7
+    memory: 1024
+    cpus: 2
+    instance_raw_config_args:
+      - "vm.network 'forwarded_port', guest: 80, host: 8080"
+provisioner:
+  name: ansible
+  lint:
+    name: ansible-lint
+verifier:
+  name: ansible
+
+####### For testing in docker ##########
+# dependency:
+#   name: galaxy
+# driver:
+#   name: docker
+# platforms:
+#   - name: instance
+#     dockerfile: Dockerfile.j2
+#     image: centos/systemd
+#     # image_version: "7"
+#     cap_add:
+#       - SYS_ADMIN
+#       - SYS_TIME
+#     privileged: true
+#     volumes:
+#        - /sys/fs/cgroup:/sys/fs/cgroup:ro
+#     #   - /var/run/docker.sock:/var/run/docker.sock:rw
+#     pre_build_image: false
+#     exposed_ports:
+#       - 80/tcp
+#     published_ports:
+#       - 0.0.0.0:8888:80/tcp
+# provisioner:
+#   name: ansible
+# verifier:
+#   name: ansible

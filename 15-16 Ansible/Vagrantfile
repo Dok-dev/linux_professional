@@ -1,0 +1,50 @@
+# -*- mode: ruby -*-
+# vim: set ft=ruby :
+
+MACHINES = {
+  :nginxhost => {
+        :box_name => "centos/7",
+        :ip_addr => '192.168.60.150'
+  }
+}
+
+Vagrant.configure("2") do |config|
+
+  config.vm.network "forwarded_port", guest: 80, host: 8080
+
+  MACHINES.each_with_index do |(boxname, boxconfig), index|
+
+      config.vm.define boxname do |box|
+
+          box.vm.box = boxconfig[:box_name]
+          box.vm.host_name = boxname.to_s
+          box.vm.network "private_network", ip: boxconfig[:ip_addr]
+
+          box.vm.provision "shell", inline: <<-SHELL
+            mkdir -p ~root/.ssh; cp ~vagrant/.ssh/auth* ~root/.ssh
+            sed -i '65s/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+            systemctl restart sshd
+          SHELL
+
+          # If the host is the last element of the array do ansible provision
+          if index == MACHINES.size - 1
+            box.vm.provision 'ansible' do |ansible|
+              # ansible.verbose = "vv"
+              #ansible.galaxy_roles_path = "./roles"
+              # ansible.inventory_path = "playbooks/inventory"
+              ansible.playbook = 'playbooks/nginx.yml'
+              # ansible.limit = 'all'
+              # ansible.galaxy_role_file = "./requirements.yml"
+              # ansible.ask_vault_pass = true
+              # ansible.galaxy_command = "ansible-galaxy install --role-file=%{role_file}"
+              # ansible.raw_ssh_args = ['-o KbdInteractiveAuthentication=yes',
+                                      #'-o IdentityFile=.vagrant/machines/nginxhost/virtualbox/private_key',
+                                      # '-o GlobalKnownHostsFile=/dev/null',
+                                      # '-o UserKnownHostsFile=/dev/null',
+                                      # '-o StrictHostKeyChecking=no',
+                                      #'-o ServerAliveInterval=60']
+            end
+          end
+      end
+  end
+end

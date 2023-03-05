@@ -1,0 +1,15 @@
+---
+- hosts: nginxhost
+  become: true
+  gather_facts: false
+  vars:
+    nginx_listen_port: 8080
+
+  pre_tasks:
+  - name: Wait connection
+    wait_for_connection:
+    timeout: 10
+
+  roles:
+    - role: nginx
+#      when: inventory_hostname in groups['web']
