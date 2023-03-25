@@ -1,0 +1,36 @@
+version: '3.3'
+services:
+   postgres:
+     image: postgres:15.2
+     volumes:
+       - ./postgres-data:/var/lib/postgresql/data
+     environment:
+       POSTGRES_PASSWORD: "strong_pass"
+       POSTGRES_DB: "redmine"
+       PGDATA: "/var/lib/postgresql/data"
+     restart: always
+     networks:
+      - redmine
+   redmine:
+     build:
+       context: .
+     image: redmine:custom
+     ports:
+       - 8080:3000
+    #  volumes:
+    #    - ./themes/minimalflat2:/usr/src/redmine/public/themes/inimalflat2
+     environment:
+       REDMINE_DB_POSTGRES: "postgres"
+       REDMINE_DB_USERNAME: "postgres"
+       REDMINE_DB_PASSWORD: "strong_pass"
+       REDMINE_DB_DATABASE: "redmine"
+       REDMINE_SECRET_KEY_BASE: "…"
+     restart: always
+     networks:
+      - redmine
+volumes:
+  postgres-data:
+  redmine-data:
+networks:
+  redmine:
+    driver: bridge
