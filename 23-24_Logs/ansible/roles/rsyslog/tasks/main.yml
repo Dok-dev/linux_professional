@@ -1,0 +1,25 @@
+---
+- name: Install EPEL Repo package from standart repo
+  ansible.builtin.yum:
+    name: epel-release
+    state: present
+  become: true
+  tags:
+    - epel-package
+    - packages
+
+- name: Ensure rsyslog is instaled
+  ansible.builtin.yum:
+    name: rsyslog
+    state: present
+  become: true
+  notify:
+    - restart rsyslog
+
+- name: Create rsyslog config file from template
+  ansible.builtin.template:
+    src: templates/rsyslog.conf.j2
+    dest: /etc/rsyslog.conf
+  become: true
+  notify:
+    - restart rsyslog

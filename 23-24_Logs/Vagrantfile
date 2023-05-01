@@ -1,0 +1,69 @@
+
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+nodes = {
+  "web" => {:ip => "192.168.56.21", :cpus => "2", :mem => "1024"},
+  "log" => {:ip => "192.168.56.22", :cpus => "2", :mem => "1024"}
+}
+
+# $init_script = <<~SCRIPT
+# echo 'ok'
+# SCRIPT
+
+Vagrant.configure("2") do |config|
+    config.vm.box = "centos/7"
+    # config.vm.box = "alse-vanilla-base/1.7.3"
+    # config.vm.box_url = "https://dl.astralinux.ru/vagrant/alse-vanilla-base%2F1.7.3"
+    # config.vm.provision "shell", inline: "sed -i 's/extended 1.7_x86-64 main/extended 1.7_x86-64 astra-ce main/' /etc/apt/sources.list"
+
+    config.vm.boot_timeout = 600
+    config.vm.provision "file",  preserve_order: true, source: "~/.ssh/id_rsa.pub", destination: "/home/vagrant/.ssh/id_rsa.pub"
+    config.vm.provision "shell", preserve_order: true, inline: "cat /home/vagrant/.ssh/id_rsa.pub >> /home/vagrant/.ssh/authorized_keys"
+
+    nodes.each_with_index do |(hostname, cfg), index|
+        config.vm.define hostname do |node|
+            node.vm.synced_folder ".", "/vagrant", disabled: true
+            node.vm.hostname = hostname
+            node.vm.provider "virtualbox" do |v|
+                v.cpus = cfg[:cpus]
+                v.memory = cfg[:mem]
+                v.auto_nat_dns_proxy = false
+                v.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
+                v.customize ["modifyvm", :id, "--natdnshostresolver1", "off"]
+                v.customize ["modifyvm", :id, "--audio", "none"]
+                v.customize ["modifyvm", :id, "--pae", "off"]
+                v.customize ['modifyvm', :id, '--nested-hw-virt', 'on']
+            end
+
+        node.vm.network "private_network",
+            :ip => cfg[:ip],
+            :virtualbox__host_ip => "192.168.56.1",
+            :virtualbox__dhcp_enabled => false,
+            :virtualbox__forward_mode => "nat",
+            :virtualbox__netmask => "255.255.255.0"
+
+        # If the host is the last element of the array do ansible provision
+        if index == nodes.size - 1
+            # node.trigger.before :up do |trigger|
+            # trigger.warn = "=== Run ansible provisioning ==="
+            # trigger.run = {inline: $init_script}
+            # end
+            node.vm.provision 'ansible' do |ansible|
+            ansible.inventory_path = "ansible/inventory"
+            ansible.playbook = 'ansible/play.yml'
+            ansible.limit = 'all'
+            #ansible.galaxy_role_file = 'requirements.yml'
+            #ansible.galaxy_command = 'ansible-galaxy install --role-file=%{role_file} --roles-path=%{roles_path}'
+            ansible.galaxy_roles_path = './roles'
+            ansible.raw_ssh_args = ['-o KbdInteractiveAuthentication=yes',
+                                    '-o IdentityFile=~/.ssh/id_rsa',
+                                    '-o GlobalKnownHostsFile=/dev/null',
+                                    '-o UserKnownHostsFile=/dev/null',
+                                    '-o StrictHostKeyChecking=no',
+                                    '-o ServerAliveInterval=30']
+            end
+        end
+    end
+  end
+end

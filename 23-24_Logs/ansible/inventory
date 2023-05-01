@@ -1,0 +1,19 @@
+web:
+  hosts:
+    web:
+        ansible_host: 192.168.56.21
+        ansible_port: 22
+        ansible_user: vagrant
+        vars:
+            # ansible_private_key_file: .vagrant/machines/web/virtualbox/private_key
+            ansible_python_interpreter: /usr/bin/python3
+
+log:
+  hosts:
+    log:
+        ansible_host: 192.168.56.22
+        ansible_port: 22
+        ansible_user: vagrant
+        vars:
+            # ansible_private_key_file: .vagrant/machines/log/virtualbox/private_key
+            ansible_python_interpreter: /usr/bin/python3

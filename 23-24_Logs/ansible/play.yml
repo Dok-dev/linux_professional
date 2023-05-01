@@ -1,0 +1,106 @@
+---
+- name: Common tasks
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Set time zone
+      ansible.builtin.copy:
+        remote_src: True
+        src: /usr/share/zoneinfo/Europe/Moscow
+        dest: /etc/localtime
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Restart service cron on centos
+      ansible.builtin.systemd:
+        state: restarted
+        daemon_reload: true
+        name: crond
+
+    - name: Get dates
+      ansible.builtin.shell: date
+      register: command_output
+
+    - name: Print dates
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+
+    - name: Put SELinux in permissive mode.
+      ansible.posix.selinux:
+        policy: targeted
+        state: permissive
+
+
+- name: Install and setup log server
+  hosts: log
+  become: true
+  roles:
+    - rsyslog
+  tasks:
+    - name: Open audit remote port
+      ansible.builtin.lineinfile:
+        dest: "/etc/audit/auditd.conf"
+        regexp: 'tcp_listen_port ='
+        line: tcp_listen_port = 60
+
+    - name: Restart auditd service
+      ansible.builtin.service:
+        state: restarted
+        name: auditd
+        use: service # Need to use exactly the "restart service" command
+
+
+- name: Install and setup web server
+  hosts: web
+  become: true
+  roles:
+    - nginx
+  tasks:
+    - name: Set audit rules
+      ansible.builtin.lineinfile:
+        dest: "/etc/audit/rules.d/audit.rules"
+        line: |
+              -w /etc/nginx/nginx.conf -p wa -k nginx_conf
+              -w /etc/nginx/default.d/ -p wa -k nginx_conf
+      notify: restart_auditd
+
+    - name: Restart auditd service
+      ansible.builtin.service:
+        state: restarted
+        name: auditd
+        use: service
+
+    - name: Install audispd-plugins
+      ansible.builtin.yum:
+        name: audispd-plugins
+        state: present
+
+    - name: Set audit rules
+      ansible.builtin.lineinfile:
+        dest: "/etc/audit/auditd.conf"
+        regexp: '^name_format ='
+        line: name_format = HOSTNAME
+      notify: restart_auditd
+
+    - name: Set active mode to remote audit loggin
+      ansible.builtin.lineinfile:
+        dest: "/etc/audisp/plugins.d/au-remote.conf"
+        regexp: '^active ='
+        line: active = yes
+      notify: restart_auditd
+
+    - name: Set remote logs server
+      ansible.builtin.lineinfile:
+        dest: "/etc/audisp/audisp-remote.conf"
+        regexp: '^remote_server ='
+        line: remote_server = 192.168.56.22
+      notify: restart_auditd
+
+  handlers:
+    - name: restart_auditd
+      ansible.builtin.service:
+        state: restarted
+        name: auditd
+        use: service # Need to use exactly the "restart service" command
