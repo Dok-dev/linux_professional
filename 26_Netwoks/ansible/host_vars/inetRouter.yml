@@ -1,0 +1,24 @@
+routes_eth1: |
+  192.168.0.0/22 via 192.168.255.2
+  192.168.255.4/30 via 192.168.255.2
+  192.168.255.8/30 via 192.168.255.2
+
+iptables_rules: |
+  *filter
+  :INPUT ACCEPT [0:0]
+  :FORWARD ACCEPT [0:0]
+  :OUTPUT ACCEPT [37:2828]
+  -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+  -A INPUT -p icmp -j ACCEPT
+  -A INPUT -i lo -j ACCEPT
+  -A INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT
+  COMMIT
+  *nat
+  :PREROUTING ACCEPT [1:161]
+  :INPUT ACCEPT [0:0]
+  :OUTPUT ACCEPT [0:0]
+  :POSTROUTING ACCEPT [0:0]
+  -A POSTROUTING ! -d 192.168.0.0/16 -o eth0 -j MASQUERADE
+  COMMIT
+
+ansible_private_key_file: .vagrant/machines/inetRouter/virtualbox/private_key

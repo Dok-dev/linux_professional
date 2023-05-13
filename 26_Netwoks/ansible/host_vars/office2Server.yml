@@ -1,0 +1,25 @@
+net_config: |
+  source-directory /etc/network/interfaces.d
+
+  auto lo
+  iface lo inet loopback
+
+  auto eth0
+  allow-hotplug eth0
+  iface eth0 inet static
+        address 10.0.2.15
+        netmask 255.255.255.0
+
+  auto eth1
+  iface eth1 inet static
+        address 192.168.1.2
+        netmask 255.255.255.128
+        gateway 192.168.1.1
+        post-up ip route add default via 192.168.1.1 dev eth1
+
+  auto eth2
+  iface eth2 inet static
+        address 192.168.60.31
+        netmask 255.255.255.0
+
+ansible_private_key_file: .vagrant/machines/office2Server/virtualbox/private_key

@@ -1,0 +1,20 @@
+routers:
+  hosts:
+    inetRouter:
+        ansible_host: 192.168.60.10
+    centralRouter:
+        ansible_host: 192.168.60.11
+    office1Router:
+        ansible_host: 192.168.60.20
+    office2Router:
+        ansible_host: 192.168.60.30
+
+servers:
+  hosts:
+    office1Server:
+        ansible_host: 192.168.60.21
+    office2Server:
+        ansible_host: 192.168.60.31
+    centralServer:
+        ansible_host: 192.168.60.12
+        ansible_private_key_file: .vagrant/machines/centralServer/virtualbox/private_key
