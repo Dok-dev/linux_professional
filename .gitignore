@@ -10,3 +10,4 @@ vagrant_boxes/
 commit_version
 .vagrant
 *.vdi
+*.iso
