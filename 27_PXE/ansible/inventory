@@ -1,0 +1,5 @@
+servers:
+  hosts:
+    pxeserver:
+        ansible_host: 192.168.60.10
+        ansible_private_key_file: .vagrant/machines/pxeserver/virtualbox/private_key
