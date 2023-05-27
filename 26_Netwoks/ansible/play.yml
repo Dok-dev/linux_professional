@@ -143,7 +143,9 @@
 
         - name: Istall traceroute on CentOs hosts
           ansible.builtin.yum:
-            name: traceroute
+            name:
+            - epel-release
+            - traceroute
             state: present
             update_cache: true
           when: (ansible_hostname == "centralServer")
@@ -160,8 +162,8 @@
             cmd: traceroute 77.88.8.8
           register: command_output
 
-        - name: Print dates
+        - name: Print traceroute
           ansible.builtin.debug:
             var: command_output.stdout_lines
 
-      when: "'servers' in group_names"
+      when: inventory_hostname in groups['servers']
