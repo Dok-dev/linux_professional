@@ -1,0 +1,28 @@
+netplan_conf: |
+  network:
+    version: 2
+    renderer: networkd
+    ethernets:
+      enp0s8:
+        addresses:
+        - 192.168.255.10/30
+        routes:
+        - to: 0.0.0.0/0
+          via: 192.168.255.9
+      enp0s9:
+        addresses:
+        - 192.168.2.1/26
+      enp0s10:
+        addresses:
+        - 192.168.2.65/26
+      enp0s16:
+        addresses:
+        - 192.168.2.129/26
+      enp0s17:
+        addresses:
+        - 192.168.2.193/26
+      enp0s19:
+        addresses:
+        - 192.168.60.20/24
+
+ansible_private_key_file: .vagrant/machines/office1Router/virtualbox/private_key

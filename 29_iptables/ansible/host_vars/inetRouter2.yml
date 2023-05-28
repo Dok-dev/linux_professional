@@ -1,0 +1,32 @@
+routes_eth1: |
+  192.168.255.4/30 via 192.168.255.14
+  192.168.255.8/30 via 192.168.255.14
+  192.168.0.0/22 via 192.168.255.14
+
+iptables_rules: |
+  *filter
+  :INPUT DROP [0:0]
+  :FORWARD ACCEPT [0:0]
+  :OUTPUT ACCEPT [0:0]
+  :TRAFFIC - [0:0]
+  :SSH-INPUT - [0:0]
+  :SSH-INPUTTWO - [0:0]
+  -A INPUT -j TRAFFIC
+  -A TRAFFIC -i lo -j ACCEPT
+  -A TRAFFIC -p icmp --icmp-type any -j ACCEPT
+  -A TRAFFIC -m state --state ESTABLISHED,RELATED -j ACCEPT
+  -A TRAFFIC -j DROP
+  -A FORWARD 
+  COMMIT
+  *nat
+  :PREROUTING ACCEPT [0:0]
+  :INPUT ACCEPT [0:0]
+  :OUTPUT ACCEPT [0:0]
+  :POSTROUTING ACCEPT [0:0]
+  -A PREROUTING -i eth0 -p tcp -m tcp --dport 8080 -j DNAT --to-destination 192.168.0.2:80
+  -A POSTROUTING --destination 192.168.0.2/32 -j SNAT --to-source 192.168.255.13
+  # SNAT is faster then MASQUERADE
+  # -A POSTROUTING ! -d 192.168.0.0/16 -o eth1 -j MASQUERADE
+  COMMIT
+
+ansible_private_key_file: .vagrant/machines/inetRouter2/virtualbox/private_key

@@ -1,0 +1,7 @@
+routes_eth5: |
+  192.168.2.0/24 via 192.168.255.10
+
+routes_eth6: |
+  192.168.1.0/24 via 192.168.255.6
+
+ansible_private_key_file: .vagrant/machines/centralRouter/virtualbox/private_key

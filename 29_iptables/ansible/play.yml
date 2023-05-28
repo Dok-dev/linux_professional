@@ -1,0 +1,178 @@
+---
+- name: Network configuration
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+
+    - name: Set up forward packages across routers
+      ansible.builtin.sysctl:
+        name: net.ipv4.conf.all.forwarding
+        value: '1'
+        state: present
+      when: "'routers' in group_names"
+
+
+    - name: Set up NAT on inetRouters
+      block: 
+
+        - name: Add routes
+          ansible.builtin.copy:
+            dest: /etc/sysconfig/network-scripts/route-eth1
+            content: "{{ routes_eth1 }}"
+            owner: root
+            group: root
+            mode: 0644
+
+        - name: Restart networks
+          ansible.builtin.systemd:
+            name: network
+            state: restarted
+
+        - name: Install iptables
+          ansible.builtin.yum:
+            name:
+            - iptables
+            - iptables-services
+            state: present
+            update_cache: true
+        
+        - name: Copy iptables config
+          ansible.builtin.copy: 
+            content: "{{ iptables_rules }}"
+            dest: /etc/sysconfig/iptables
+            owner: root
+            group: root
+            mode: 0600
+
+        - name: Restart end anable iptables
+          ansible.builtin.service:
+            name: iptables
+            enabled: true
+            state: restarted
+        
+        # Because ansible.builtin.service and ansible.builtin.systemd does not help
+        - name: Restart networks on inetRouter
+          ansible.builtin.shell:
+            cmd: systemctl restart network
+
+      when: "'inetRouter' in ansible_hostname"
+
+
+    - name: Set central office routes
+      block:
+
+        - name: Disabe default route
+          ansible.builtin.lineinfile:
+            dest: /etc/sysconfig/network-scripts/ifcfg-eth0
+            line: DEFROUTE=no
+
+        - name: Set up central office router
+          block:
+          - name: Add default gateway
+            ansible.builtin.lineinfile:
+              dest: /etc/sysconfig/network-scripts/ifcfg-eth1
+              line: GATEWAY=192.168.255.1
+
+          - name: Set routes for centralRouter
+            block:
+              - name: Add route to office1 for centralRouter
+                ansible.builtin.copy:
+                  dest: /etc/sysconfig/network-scripts/route-eth5
+                  content: "{{ routes_eth5 }}"
+                  owner: root
+                  group: root
+                  mode: 0644
+
+              - name: Add route to office2 for centralRouter
+                ansible.builtin.copy:
+                  dest: /etc/sysconfig/network-scripts/route-eth6
+                  content: "{{ routes_eth6 }}"
+                  owner: root
+                  group: root
+                  mode: 0644
+          when: (ansible_hostname == "centralRouter")
+
+        - name: Restart networks on central office
+          ansible.builtin.service:
+            name: network
+            state: restarted
+
+      when: "'central' in ansible_hostname"
+
+
+    - name: Set office1 routes
+      block:
+
+        - name: Set routes for office1
+          ansible.builtin.template:
+            src: templates/netplan.j2
+            dest: /etc/netplan/50-vagrant.yaml
+            owner: root
+            group: root
+            mode: 0644
+
+        - name: Apply netplan for office1
+          command: sudo netplan apply
+
+      when: "'office1' in ansible_hostname"
+
+
+    - name: Set office2 routes
+      block:
+
+        - name: Set routes for office2
+          ansible.builtin.copy: 
+            content: "{{ net_config }}"
+            dest: /etc/network/interfaces
+            owner: root
+            group: root
+            mode: 0644
+
+        - name: Restart networks on office2
+          ansible.builtin.service:
+            name: networking
+            state: restarted
+          # systemctl restart networking в debian 11.7 при открытых подключениях не отрабатывает без ошибок
+          ignore_errors: true
+
+      when: "'office2' in ansible_hostname"
+
+
+  roles:
+    - role: nginx
+      when: (ansible_hostname == "centralServer")
+
+
+  post_tasks:
+
+    - name: Tests
+      block:
+
+        - name: Istall traceroute on CentOS hosts
+          ansible.builtin.yum:
+            name:
+            - epel-release
+            - traceroute
+            state: present
+            update_cache: true
+          when: (ansible_hostname == "centralServer")
+
+        - name: Istall traceroute on debian hosts
+          ansible.builtin.apt:
+            name: traceroute
+            state: present
+            update_cache: true
+          when: "'office' in ansible_hostname"
+
+        - name: Test routes
+          ansible.builtin.shell:
+            cmd: traceroute 77.88.8.8
+          register: command_output1
+
+        - name: Print traceroute
+          ansible.builtin.debug:
+            var: command_output1.stdout_lines
+
+      when: inventory_hostname in groups['servers']
