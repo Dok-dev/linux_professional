@@ -1,0 +1,61 @@
+!Указание версии FRR
+frr version 8.1
+frr defaults traditional
+!Указываем имя машины
+hostname {{ ansible_hostname }}
+log syslog informational
+no ipv6 forwarding
+service integrated-vtysh-config
+!
+!Добавляем информацию об интерфейсе enp0s8
+interface enp0s8
+!Указываем имя интерфейса
+description r1-r2
+!Указываем ip-aдрес и маску (эту информацию мы получили в прошлом шаге)
+ip address {{ ansible_facts['enp0s8']['ipv4']['address'] }}/30
+!Указываем параметр игнорирования MTU
+ip ospf mtu-ignore
+!Если потребуется, можно указать «стоимость» интерфейса
+{% if ansible_hostname == 'router1' %}
+ip ospf cost 1000
+{% elif ansible_hostname == 'router2' and symmetric_routing == true %}
+ip ospf cost 1000
+{% else %}
+!ip ospf cost 450
+{% endif %}
+!Указываем параметры hello-интервала для OSPF пакетов
+ip ospf hello-interval 10
+!Указываем параметры dead-интервала для OSPF пакетов
+!Должно быть кратно предыдущему значению
+ip ospf dead-interval 30
+!
+interface enp0s9
+description r1-r3
+12
+ip address {{ ansible_facts['enp0s9']['ipv4']['address'] }}/30
+ip ospf mtu-ignore
+!ip ospf cost 45
+ip ospf hello-interval 10
+ip ospf dead-interval 30
+interface enp0s10
+description net_{{ ansible_hostname }}
+ip address {{ ansible_facts['enp0s10']['ipv4']['address'] }}/24
+ip ospf mtu-ignore
+!ip ospf cost 45
+ip ospf hello-interval 10
+ip ospf dead-interval 30
+!
+!Начало настройки OSPF
+router ospf
+!Указываем router-id
+{% if router_id_enable == false %}!{% endif %}router-id {{ router_id }}
+!Указываем сети, которые хотим анонсировать соседним роутерам
+network {{ ansible_facts['enp0s8']['ipv4']['network'] }}/30 area 0
+network {{ ansible_facts['enp0s9']['ipv4']['network'] }}/30 area 0
+network {{ ansible_facts['enp0s10']['ipv4']['network'] }}/24 area 0
+!Указываем адреса соседних роутеров
+neighbor {{ neighbor1_ip }}
+neighbor {{ neighbor2_ip }}
+!Указываем адрес log-файла
+log file /var/log/frr/frr.log
+default-information originate always

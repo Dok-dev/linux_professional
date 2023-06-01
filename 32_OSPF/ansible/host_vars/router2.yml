@@ -1,0 +1,4 @@
+---
+router_id: "2.2.2.2"
+neighbor1_ip: "10.0.10.1"
+neighbor2_ip: "10.0.11.1"
