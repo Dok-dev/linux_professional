@@ -1,0 +1,70 @@
+---
+
+- name: Install epel-release on CentOS
+  ansible.builtin.yum:
+    name:
+      - epel-release
+    state: present
+    update_cache: true
+  become: true
+
+- name: Install OpenVPN on CentOS
+  ansible.builtin.yum:
+    name:
+      - openvpn
+      - easy-rsa
+      - iperf3
+    state: present
+    update_cache: true
+  become: true
+
+- name: Put SELinux in permissive mode.
+  ansible.posix.selinux:
+    policy: targeted
+    state: permissive
+  become: true
+
+- name: Create OpenVPN key
+  ansible.builtin.shell: openvpn --genkey --secret /etc/openvpn/static.key
+  notify:
+    - restart OpenVPN server
+
+- name: Create easy-rsa keys
+  ansible.builtin.shell: |
+    export RSA_VER=$(ls /usr/share/easy-rsa/ --sort=version --reverse | head -n1)
+    rm -rf /etc/openvpn/pki
+    /usr/share/easy-rsa/${RSA_VER}/easyrsa init-pki
+    echo 'rasvpn' | /usr/share/easy-rsa/${RSA_VER}/easyrsa build-ca nopass
+    echo 'rasvpn' | /usr/share/easy-rsa/${RSA_VER}/easyrsa gen-req server nopass
+    echo 'yes' | /usr/share/easy-rsa/${RSA_VER}/easyrsa sign-req server server
+    /usr/share/easy-rsa/${RSA_VER}/easyrsa gen-dh
+    openvpn --genkey --secret ca.key
+    echo 'client' | /usr/share/easy-rsa/${RSA_VER}/easyrsa gen-req client nopass
+    echo 'yes' | /usr/share/easy-rsa/${RSA_VER}/easyrsa sign-req client client
+  args:
+    chdir: /etc/openvpn/
+    executable: /bin/bash
+  notify:
+    - restart OpenVPN server
+
+- name: Create OpenVPN server config
+  ansible.builtin.template:
+    src: server.conf.j2
+    dest: /etc/openvpn/server.conf
+    owner: root
+    group: root
+    mode: 0644
+  become: true
+  notify:
+    - restart OpenVPN server
+
+- name: Create OpenVPN systemd unit
+  ansible.builtin.template:
+    src: openvpn@.service
+    dest: /etc/systemd/system/openvpn@.service
+    owner: root
+    group: root
+    mode: 0644
+  become: true
+  notify:
+    - restart OpenVPN server

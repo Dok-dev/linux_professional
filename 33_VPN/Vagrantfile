@@ -1,0 +1,43 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+Vagrant.configure(2) do |config|
+    config.vm.box = "centos/7"
+    config.vm.define "server" do |server|
+        server.vm.hostname = "server.loc"
+        server.vm.network "private_network", ip: "192.168.60.10"
+    end
+    config.vm.define "client" do |client|
+        client.vm.hostname = "client.loc"
+        client.vm.network "private_network", ip: "192.168.60.20"
+
+        client.vm.provision "playbook1", type:'ansible' do |ansible|
+            ansible.playbook = "TUN/vpn-tun.yml"
+            ansible.inventory_path = "TUN/inventory"
+            ansible.galaxy_roles_path = "./roles"
+            ansible.host_key_checking = "false"
+            ansible.limit = "all"
+
+        end
+
+        client.vm.provision "playbook2", after: "playbook1", type:'ansible' do |ansible|
+            ansible.playbook = "TUN/vpn-tun.yml"
+            ansible.inventory_path = "TUN/inventory"
+            ansible.galaxy_roles_path = "./roles"
+            ansible.host_key_checking = "false"
+            ansible.limit = "all"
+            # ansible.verbose = "vvv"
+            ansible.extra_vars = {
+                vpn_mode: "tap"
+            }
+        end
+
+        client.vm.provision "playbook3", after: "playbook2", type:'ansible' do |ansible|
+            ansible.playbook = "RAS/vpn-ras.yml"
+            ansible.inventory_path = "RAS/inventory"
+            ansible.galaxy_roles_path = "./roles"
+            ansible.host_key_checking = "false"
+            ansible.limit = "all"
+        end
+
+    end
+end

@@ -1,0 +1,8 @@
+routers:
+  hosts:
+    server.loc:
+        ansible_host: 192.168.60.10
+        ansible_private_key_file: .vagrant/machines/server/virtualbox/private_key
+    client.loc:
+        ansible_host: 192.168.60.20
+        ansible_private_key_file: .vagrant/machines/client/virtualbox/private_key

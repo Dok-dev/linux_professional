@@ -1,0 +1,7 @@
+---
+extra_options: |
+  secret /etc/openvpn/static.key
+  ifconfig 10.10.10.2 255.255.255.0
+  remote 192.168.60.10
+  route 192.168.60.0 255.255.255.0
+  topology subnet

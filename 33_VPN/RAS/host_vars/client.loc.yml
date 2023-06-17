@@ -1,0 +1,13 @@
+---
+extra_options: |
+  proto udp
+  remote 192.168.60.10 1207
+  client
+  resolv-retry infinite
+  remote-cert-tls server
+  ca /etc/openvpn/pki/ca.crt
+  cert /etc/openvpn/pki/issued/client.crt
+  key /etc/openvpn/pki/private/client.key
+  route 192.168.60.0 255.255.255.0 192.168.60.20
+  persist-key
+  persist-tun

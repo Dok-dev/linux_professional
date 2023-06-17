@@ -1,0 +1,4 @@
+---
+ansible_port: 22
+ansible_user: vagrant
+# openvpnserver: "{{ hostvars['server.loc'].ansible_default_ipv4.address }}"

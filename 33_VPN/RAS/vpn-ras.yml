@@ -1,0 +1,85 @@
+---
+- name: VPN stand
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+  - debug:
+      msg: "========== Start in RAS mode =========="
+
+  roles:
+  - openvpn
+
+  post_tasks:
+
+  - name: Run iperf3 on OpenVPN server
+    ansible.builtin.shell: iperf3 -s -D -1
+    when: 
+      - ansible_hostname == "server"
+
+  - name: Set up OpenVPN client and test
+    block:
+
+    - name: Copy private key for server
+      ansible.builtin.copy:
+        src: ../.vagrant/machines/server/virtualbox/private_key
+        dest: /home/vagrant/server_key
+        owner: vagrant
+        group: vagrant
+        mode: '0600'
+
+    - name: Transfer files from OpenVPN server
+      ansible.builtin.synchronize:
+        mode: pull
+        src: vagrant@192.168.60.10:/etc/openvpn/pki
+        dest: /etc/openvpn
+        # set_remote_user: no
+        recursive: true
+        delete: true # delete files in dest on the remote host that are not found in src of localhost (optonal)
+        private_key: /home/vagrant/server_key
+        rsync_opts:
+          - "-I --checksum --rsync-path='sudo -u root rsync'"
+      delegate_to: client.loc
+      become: true
+
+    - name: Restart OpenVPN client
+      ansible.builtin.systemd:
+        state: restarted
+        name: openvpn@server
+        enabled: true
+
+    - name: Run ping OpenVPN server
+      ansible.builtin.shell: ping -c 4 10.10.10.1
+      register: command_output
+
+    - name: Print ping results
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+
+    - name: Run ip route
+      ansible.builtin.shell: ip r
+      register: command_output
+
+    - name: Print ip route results
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+
+    - name: Run iperf3 on OpenVPN client
+      ansible.builtin.shell: iperf3 -c 10.10.10.1 -t 40 -i 5
+      register: command_output
+
+    - name: Print iperf3 results
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+
+    - name: Run ip route on OpenVPN client
+      ansible.builtin.shell: ip r
+      register: command_output
+
+    - name: Print ip route results
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+
+    when: 
+      - ansible_hostname == "client"
