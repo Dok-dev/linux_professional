@@ -13,7 +13,7 @@
 
 ## Выполнение     
 
-Подготовлен [Vagrantfile](./Vagrantfile) c [ansible playbook](ansible/provision.yml) разворачивающий данный стенд.
+Подготовлен [Vagrantfile](./Vagrantfile), [роль](./roles/openvpn/) и ansible playbooks разворачивающие данный стенд.
 
 Использование:    
 ```bash

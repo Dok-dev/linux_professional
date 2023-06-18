@@ -1,0 +1,9 @@
+domain dns.lab
+search dns.lab
+# nameserver 127.0.0.1
+{% if ansible_hostname == 'ns02' %}
+nameserver 192.168.60.11
+{% endif %}
+{% if ansible_hostname == 'ns01' %}
+nameserver 192.168.60.10
+{% endif %}

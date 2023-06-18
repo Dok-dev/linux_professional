@@ -1,0 +1,174 @@
+---
+- hosts: all
+  become: true
+  tasks:
+
+  - name: put SELinux in permissive mode
+    ansible.posix.selinux:
+      policy: targeted
+      state: permissive
+
+  - name: install packages
+    yum:
+      name: "{{ item }}"
+      state: latest 
+    with_items:
+      - bind
+      - bind-utils
+    #  - ntp
+
+#  - name: stop and disable chronyd
+#     service: 
+#       name: chronyd
+#       state: stopped
+#       enabled: false
+      
+#   - name: start and enable ntpd 
+#     service: 
+#       name: ntpd
+#       state: started
+#       enabled: true
+
+  - name: start chronyd
+    service: 
+      name: chronyd
+      state: restarted
+      enabled: true
+
+  - name: copy transferkey to all servers and the client
+    copy:
+      src: named.zonetransfer.key
+      dest: /etc/named.zonetransfer.key
+      owner: root
+      group: named
+      mode: 0644
+
+
+- hosts: ns01
+  become: true
+  tasks:
+
+  - name: copy named.conf
+    copy:
+      src: master-named.conf
+      dest: /etc/named.conf
+      owner: root
+      group: named
+      mode: 0640
+
+  - name: copy zones
+    copy: 
+      src: "{{ item }}"
+      dest: /etc/named/
+      owner: root
+      group: named
+      mode: 0660
+    with_fileglob:
+      - named.d*
+      - named.newdns.lab
+
+  - name: copy resolv.conf to the servers
+    template: 
+      src: servers-resolv.conf.j2 
+      dest: /etc/resolv.conf 
+      owner: root 
+      group: root
+      mode: 0644
+  
+  - name: set /etc/named permissions
+    file:
+      path: /etc/named
+      owner: root
+      group: named
+      mode: 0670
+
+  - name: ensure named is running and enabled
+    service: 
+      name: named
+      state: restarted
+      enabled: true
+
+
+- hosts: ns02
+  become: true
+  tasks:
+
+  - name: copy named.conf
+    copy:
+      src: slave-named.conf
+      dest: /etc/named.conf
+      owner: root
+      group: named
+      mode: 0640
+
+  - name: copy resolv.conf to the servers
+    template: 
+      src: servers-resolv.conf.j2 
+      dest: /etc/resolv.conf 
+      owner: root 
+      group: root
+      mode: 0644
+
+  - name: set /etc/named permissions
+    file:
+      path: /etc/named
+      owner: root
+      group: named
+      mode: 0670
+
+  - name: ensure named is running and enabled
+    service: 
+      name: named
+      state: restarted
+      enabled: true
+
+
+- hosts: 
+  - client1
+  - client2
+  become: true
+  tasks:
+  - name: copy resolv.conf to the client
+    copy: src=client-resolv.conf dest=/etc/resolv.conf owner=root group=root mode=0644
+  - name: copy rndc conf file
+    copy: src=rndc.conf dest=/home/vagrant/rndc.conf owner=vagrant group=vagrant mode=0644
+  - name: copy motd to the client
+    copy: src=client-motd dest=/etc/motd owner=root group=root mode=0644
+  
+  - name: Tests client1
+    block:
+    - name: Run tests client1
+      ansible.builtin.shell: |
+        echo 'lookup www.newdns.lab'
+        dig www.newdns.lab +short
+        echo 'lookup web1.dns.lab'
+        dig web1.dns.lab +short
+        echo 'lookup web2.dns.lab'
+        dig web2.dns.lab +short
+      register: command_output
+
+    - name: Print tests results
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+
+    when: 
+    - ansible_hostname == "client1"
+
+  - name: Tests client2
+    block:
+    - name: Run tests client2
+      ansible.builtin.shell: |
+        echo 'lookup www.newdns.lab'
+        dig www.newdns.lab +short
+        echo 'lookup web1.dns.lab'
+        dig web1.dns.lab +short
+        echo 'lookup web2.dns.lab'
+        dig web2.dns.lab +short
+      register: command_output
+
+    - name: Print tests results
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+
+    when: 
+    - ansible_hostname == "client2"
