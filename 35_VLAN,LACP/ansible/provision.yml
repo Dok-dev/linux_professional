@@ -1,0 +1,141 @@
+- name: Base set up
+  hosts: all
+  become: true
+  tasks:
+
+  #Установка приложений на RedHat-based системах
+  - name: install softs on CentOS
+    yum:
+      name:
+        - vim
+        - traceroute
+        - tcpdump
+        - net-tools
+      state: present
+      update_cache: true
+    when: (ansible_os_family == "RedHat")
+  
+  #Установка приложений на Debiam-based системах
+  - name: install softs on Debian-based
+    apt:
+      name: 
+        - vim
+        - traceroute
+        - tcpdump
+        - net-tools
+      state: present
+      update_cache: true
+    when: (ansible_os_family == "Debian")
+
+
+- name: set up vlan1
+  #Настройка будет производиться на хостах testClient1 и testServer1
+  hosts: testClient1,testServer1
+  #Настройка производится от root-пользователя
+  become: true
+  tasks:
+
+  #Добавление темплейта в файл /etc/sysconfig/network-scripts/ifcfg-vlan1
+  - name: set up vlan1
+    template:
+      src: templates/ifcfg-vlan1.j2
+      dest: /etc/sysconfig/network-scripts/ifcfg-vlan1
+      owner: root
+      group: root
+      mode: 0644
+  
+  #Перезапуск службы NetworkManager
+  - name: restart network for vlan1
+    service:
+      name: NetworkManager
+      state: restarted
+
+  - name: Test VLAN1
+    block:
+
+    - name: Run ping testServer1 from testClient1
+      ansible.builtin.shell: ping -c 4 10.10.10.1
+      register: command_output
+
+    - name: Print ping results
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+  
+    when: 
+      - ansible_hostname == "testClient1"
+
+
+- name: set up vlan2
+  hosts: testClient2,testServer2
+  become: true
+  tasks:
+
+  - name: set up vlan2
+    template:
+      src: templates/50-cloud-init.yaml.j2
+      dest: /etc/netplan/50-cloud-init.yaml 
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: apply set up vlan2
+    shell: netplan apply
+    become: true
+
+  - name: Test VLAN2
+    block:
+
+    - name: Run ping testServer2 from testClient2
+      ansible.builtin.shell: ping -c 4 10.10.10.1
+      register: command_output
+
+    - name: Print ping results
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+  
+    when: 
+      - ansible_hostname == "testClient2"
+
+# Настройка LACP между хостами inetRouter и centralRouter
+- name: set up bond0
+  hosts: inetRouter,centralRouter
+  become: true
+  tasks:
+
+  - name: set up ifcfg-bond0
+    template:
+      src: templates/ifcfg-bond0.j2
+      dest: /etc/sysconfig/network-scripts/ifcfg-bond0
+      owner: root
+      group: root
+      mode: 0644
+  
+  - name: set up eth1,eth2
+    copy: 
+      src: "{{ item }}" 
+      dest: /etc/sysconfig/network-scripts/
+      owner: root
+      group: root
+      mode: 0644
+    with_items:
+      - templates/ifcfg-eth1
+      - templates/ifcfg-eth2
+
+  #Перезагрузка хостов 
+  - name: restart hosts for bond0
+    reboot:
+      reboot_timeout: 3600
+
+  - name: Test LACP
+    block:
+
+    - name: Run ping centralRouter from inetRouter
+      ansible.builtin.shell: ping -c 4 192.168.255.2
+      register: command_output
+
+    - name: Print ping results
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+  
+    when: 
+      - ansible_hostname == "inetRouter"
