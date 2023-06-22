@@ -130,12 +130,26 @@
     block:
 
     - name: Run ping centralRouter from inetRouter
-      ansible.builtin.shell: ping -c 4 192.168.255.2
+      ansible.builtin.shell: ping -c 2 192.168.255.2
       register: command_output
 
     - name: Print ping results
       ansible.builtin.debug:
         var: command_output.stdout_lines
-  
+
+    - name: Down eth1 interface
+      ansible.builtin.shell: ifconfig eth1 down
+
+    - name: Run ping centralRouter from inetRouter
+      ansible.builtin.shell: ping -c 2 192.168.255.2
+      register: command_output
+
+    - name: Print ping results
+      ansible.builtin.debug:
+        var: command_output.stdout_lines
+
+    - name: Up eth1 interface
+      ansible.builtin.shell: ifconfig eth1 up
+
     when: 
       - ansible_hostname == "inetRouter"
