@@ -1,0 +1,39 @@
+---
+- name: Modify nofile limits for wildcard domain
+  community.general.pam_limits:
+    domain: '*'
+    limit_type: "{{ item.limit_type }}"
+    limit_item: nofile
+    value: "{{ item.value }}"
+  loop:
+    - { limit_type: 'hard', value: "{{ freeipa_tune_nofile_hard_limit }}" }
+    - { limit_type: 'soft', value: "{{ freeipa_tune_nofile_soft_limit }}" }
+  notify:
+    - Restart ipa services
+
+- name: Up max file descriptors
+  community.general.ldap_attrs:
+    dn: cn=config
+    attributes:
+      nsslapd-maxdescriptors: "{{ freeipa_tune_nsslapd_maxdescriptors }}"
+    state: exact
+    server_uri: ldap://localhost/
+    bind_dn: cn=directory manager
+    bind_pw: "{{ freeipa_server_ds_password }}"
+  no_log: true
+  notify:
+    - Restart dirsrv
+
+- name: Create a directory for dirsrv unit override
+  ansible.builtin.file:
+    path: /etc/systemd/system/dirsrv@.service.d
+    state: directory
+
+- name: Up file descriptors in systemd-unit dirsrv
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/dirsrv@.service.d/override.conf
+    content: |
+      [Service]
+      LimitNOFILE="{{ freeipa_tune_nsslapd_maxdescriptors }}"
+  notify:
+    - Restart dirsrv

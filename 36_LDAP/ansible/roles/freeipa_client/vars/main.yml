@@ -1,0 +1,6 @@
+---
+resolv_nameservers:
+  - "{{ freeipa_master_server_ip }}"
+resolv_domain: "{{ freeipa_client_domain }}"
+resolv_search:
+  - "{{ freeipa_client_domain }}"

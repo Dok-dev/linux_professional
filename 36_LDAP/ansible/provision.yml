@@ -1,0 +1,11 @@
+- name: Install and configire Free IPA server 
+  hosts: ipa.otus.lan
+  become: true
+  roles:
+   - freeipa_server
+
+- name: Install and configire Free IPA clients 
+  hosts: client1.otus.lan, client2.otus.lan
+  become: true
+  roles:
+   - freeipa_client

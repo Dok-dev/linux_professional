@@ -1,0 +1,143 @@
+---
+
+# Kerberos realm name of the IPA deployment (in uppercase)
+# Type: STR
+# ipa-server-install option: --realm=REALM_NAME
+freeipa_server_realm: "EXAMPLE.LOC"
+
+# Primary DNS domain of the IPA deployment
+# Type: Str
+# ipa-server-install option: --domain=DOMAIN_NAME
+freeipa_server_domain: "example.loc"
+
+# FQDN of the master FreeIPA server
+# Type: Str
+# ipa-server-install option: --hostname=HOST_NAME
+freeipa_server_fqdn: "{{ inventory_hostname }}"
+
+# FreeIPA master server IP address
+# Type: ip
+# ipa-server-install option: --ip-address=IP_ADDRESS
+freeipa_server_ip: "{{ ansible_host }}"
+
+# FreeIPA server 389 Directory Server admin password
+# Type: Str
+# ipa-server-install option: -p DM_PASSWORD, --ds-password=DM_PASSWORD
+freeipa_server_ds_password: "12345678"
+
+# FreeIPA server admin password
+# Type: Str
+# ipa-server-install option: -a ADMIN_PASSWORD, --admin-password=ADMIN_PASSWORD
+freeipa_server_admin_password: "12345678"
+
+# FreeIPA crt key passphrase
+# Type: Str
+freeipa_crt_key_passphrase: "12345678"
+
+# Automatically setting an entry in /etc/hosts
+# Type: Bool
+freeipa_server_manage_host: false
+
+# Configure bind with our zone
+# Type: Bool
+# ipa-server-install option: --setup-dns
+freeipa_server_install_dns: true
+
+# Allow add a DNS forwarder. Default is false, because DNS forwarders will be set as Global DNS forwarders
+# Type: Bool
+# if false ipa-server-install option: --no-forwarders
+freeipa_server_allow_forwarders: false
+
+# List of Global DNS forwarders
+freeipa_server_global_dns_forwarder:
+  - "--forwarder=77.88.8.8"
+  - "--forwarder=8.8.8.8"
+
+# Address of dns forwarder
+# Type: Ip
+# ipa-server-install option: --forwarder=FORWARDERS
+freeipa_server_dns_forwarder: 77.88.8.8
+
+# Address of dns in the resolv.conf
+# Type: Ip
+freeipa_server_custom_dns: 77.88.8.8
+
+# Use DNS forwarders configured in /etc/resolv.conf
+# Type: Bool
+# ipa-server-install option: --auto-forwarders
+freeipa_server_dns_autoforwarder: false
+
+# Create necessary reverse zones
+# Type: Bool
+# if true ipa-server-install option: --auto-reverse
+# if false ipa-server-install option: --no-reverse
+freeipa_server_auto_reverse: true
+
+# Type: Bool
+# if true ipa-server alloy DNS recursion
+freeipa_server_enable_dns_recursion_policy: false
+
+# Configure a dogtag KRA
+# Type: bool
+# ipa-server-install option: --setup-kra
+freeipa_server_setup_kra: true
+
+# Create DNS zone even if it already exists
+# Type: bool
+# ipa-server-install option: --allow-zone-overlap
+freeipa_server_allow_zone_overlap: false
+
+# The base command for the FreeIPA server installation
+# Type: Str
+freeipa_server_install_base_command: "ipa-server-install --unattended "
+
+# The default FreeIPA server installation options
+# Type: List
+freeipa_server_install_options:
+  - "--realm={{ freeipa_server_realm }}"
+  - "--domain={{ freeipa_server_domain }}"
+  - "--hostname={{ freeipa_server_fqdn }}"
+  - "--ip-address={{ freeipa_server_ip }}"
+  - "--ds-password {{ freeipa_server_ds_password }}"
+  - "--admin-password {{ freeipa_server_admin_password }}"
+  - "--mkhomedir"
+  - "{{ '--setup-kra' if freeipa_server_setup_kra else '' }}"
+  - "{{ '--setup-dns' if freeipa_server_install_dns else '' }}"
+  - "{{ '--forwarder=' + freeipa_server_dns_forwarder if freeipa_server_allow_forwarders else '--no-forwarders' if freeipa_server_install_dns else '' }}"
+  - "{{ '--auto-forwarders' if freeipa_server_dns_autoforwarder else '' }}"
+  - "{{ '--auto-reverse' if freeipa_server_auto_reverse else '--no-reverse' if freeipa_server_install_dns else '' }}"
+  - "{{ '--allow-zone-overlap' if freeipa_server_allow_zone_overlap else '' }}"
+  # - "{{ '--http-cert-file=/etc/ipa-crt/http.p12 --http-pin=' + freeipa_crt_key_passphrase + ' --dirsrv-cert-file=/etc/ipa-crt/dirsrv.p12 --dirsrv-pin=' + freeipa_crt_key_passphrase + ' --ca-cert-file=/etc/ipa-crt/ca.crt --no-pkinit' }}"
+
+# The default URL for downloading pip packages
+freeipa_pip_repo_url: ""
+
+# The default ip or name of self-hosted pip repository
+freeipa_pip_repo_trusted_host: ""
+
+# Up search size limit
+freeipa_tune_search_size_limit: false
+
+# Up file descriptors
+freeipa_tune_max_file_descriptors: false
+
+# Adjusting the number of krb5kdc processes
+freeipa_tune_krb5_kdc_tune: false
+
+# Up buffer SASL in LDAP
+freeipa_tune_sasl_tune: false
+
+# Set nofile hard limit
+freeipa_tune_nofile_hard_limit: 1048576
+
+# Set nsslapd-sasl-max-buffer-size
+freeipa_tune_nsslapd_sasl_max_buffer_size: 10485760
+
+# Set nofile soft limit
+freeipa_tune_nofile_soft_limit: 16384
+
+# Set nsslapd-maxdescriptors
+freeipa_tune_nsslapd_maxdescriptors: 16384
+
+# Disables capability to read userPassword field
+freeipa_tune_hide_userpassword_field: false

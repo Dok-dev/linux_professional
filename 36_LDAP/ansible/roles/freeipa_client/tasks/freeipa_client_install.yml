@@ -1,0 +1,14 @@
+# Create resolv.conf with nameserver = freeipa master server ip
+- name: Create resolv.conf
+  ansible.builtin.template:
+    src: resolv.conf.j2
+    dest: /etc/resolv.conf
+    mode: "0644"
+    force: true
+
+- name: Run the FreeIPA client installer
+  ansible.builtin.command: "{{ freeipa_client_install_base_command }} {{ freeipa_client_install_options | join(' ') }}"
+  args:
+    creates: /etc/ipa/default.conf
+  no_log: "{{ freeipa_client_no_log | default(true) }}"
+  notify: Restart sssd service

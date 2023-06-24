@@ -1,0 +1,14 @@
+{% if resolv_search | length > 0 %}
+search {{ resolv_search|join(' ') }}
+{% endif %}
+{% if resolv_domain != "" %}
+domain {{ resolv_domain }}
+{% endif %}
+{% for ns in resolv_nameservers %}
+nameserver {{ ns }}
+{% endfor %}
+{% if freeipa_client_additional_resolv_ns != "" %}
+{% for ns in freeipa_client_additional_resolv_ns %}
+nameserver {{ ns }}
+{% endfor %}
+{% endif %}

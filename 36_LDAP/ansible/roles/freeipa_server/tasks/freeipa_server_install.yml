@@ -1,0 +1,71 @@
+- name: Run the FreeIPA server installer
+  ansible.builtin.command: "{{ freeipa_server_install_base_command }} {{ freeipa_server_install_options | join(' ') }}"
+  args:
+    creates: /etc/ipa/default.conf
+  notify:
+    - Restart oddjob service
+
+# Ansible module "ipa" cannot enable synchronization of reverse zones, so we do this with commands
+# Require python module pexpect
+- name: Get ipa admin ticket
+  ansible.builtin.expect:
+    command: kinit admin
+    responses:
+      "Password*": "{{ freeipa_server_admin_password }}"
+    timeout: 300
+  changed_when: false
+
+- name: Enable dns dynamic update
+  ansible.builtin.shell:
+    cmd: "ipa dnszone-mod {{ freeipa_server_domain }}. --dynamic-update=true"
+  ignore_errors: true
+  failed_when: false
+  no_log: true
+  changed_when: false
+
+# Check if PTR sync already enabled
+- name: Check PTR sync
+  ansible.builtin.shell:
+    cmd: "ipa dnszone-show {{ freeipa_server_domain }}. --all | grep PTR"
+  register: result
+  ignore_errors: true
+  failed_when: false
+  no_log: true
+  when: freeipa_server_auto_reverse
+  changed_when: false
+
+# Enable PTR sync if is not enabled
+- name: Enable PTR sync
+  ansible.builtin.shell:
+    cmd: "ipa dnszone-mod {{ freeipa_server_domain }}. --allow-sync-ptr=true"
+  when:
+    - freeipa_server_auto_reverse
+    - result.rc == 1
+
+# Set Global DNS forwarders
+- name: Set Global DNS forwarders
+  ansible.builtin.shell:
+    cmd: "ipa dnsconfig-mod {{ freeipa_server_global_dns_forwarder | join(' ') }} --forward-policy=only"
+  ignore_errors: true
+  failed_when: false
+  no_log: true
+  changed_when: false
+
+# Allow DNS recursion for IPA
+- block:
+    - name: Allow DNS recursion for any networks
+      ansible.builtin.lineinfile:
+        path: /etc/bind/ipa-options-ext.conf
+        line: "allow-recursion { any; };"
+        state: present
+      register: dns_recursion_policy
+
+    - name: Restart BIND Domain Name Server with native PKCS#11
+      ansible.builtin.systemd:
+        name: bind9-pkcs11.service
+        state: restarted
+        daemon_reload: true
+      when: dns_recursion_policy is changed
+
+  when:
+    - freeipa_server_enable_dns_recursion_policy

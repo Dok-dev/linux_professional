@@ -1,0 +1,60 @@
+---
+# FreeIPA Client fqdn
+# Type: str
+freeipa_client_fqdn: "client01.example.com"
+# REALM (in uppercase)
+# Type: str
+freeipa_client_realm: "EXAMPLE.COM"
+# FreeIPA master server
+# Type: str
+freeipa_client_master_fqdn: "dc01.example.com"
+# domain
+# Type: str
+freeipa_client_domain: "example.com"
+# Ip Address
+# Type: ip
+freeipa_client_ip: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+# FreeIPA admin
+# Type: str
+freeipa_client_principal: "admin"
+# FreeIPA admin password
+# Type: str
+freeipa_client_password: "12345678"
+# Set hostname and edit /etc/hosts
+# Type: Bool
+freeipa_client_manage_host: true
+# Enable DNS updates
+# Type: Bool
+freeipa_client_dns_updates: true
+# FreeIPA master server IP (empty, if playbook use for server deploy)
+# Type: ip
+freeipa_master_server_ip:
+# Additional DNS for client
+# Type: ip
+freeipa_client_additional_resolv_ns: []
+# NTP time server
+# Type: str
+freeipa_ntp_server: "{{ freeipa_client_master_fqdn }}"
+
+# The base command for the FreeIPA client installation
+# Type: Str
+freeipa_client_install_base_command: ipa-client-install --unattended
+
+# The default FreeIPA client installation options
+# Type: List
+freeipa_client_install_options:
+  - "--domain={{ freeipa_client_domain }}"
+  - "--server={{ freeipa_client_master_fqdn }}"
+  - "--realm={{ freeipa_client_realm }}"
+  - "--principal={{ freeipa_client_principal }}"
+  - "--password={{ freeipa_client_password }}"
+  - "--mkhomedir"
+  - "--hostname={{ freeipa_client_fqdn }}"
+  - "{{ '--ip-address=' + freeipa_client_ip if not freeipa_client_dns_updates else '' }}"
+  - "--force-join"
+  - "{{ '--ntp-server=' + freeipa_ntp_server if freeipa_ntp_server|length > 0 else '' }}"
+  - "{{ '--enable-dns-updates' if freeipa_client_dns_updates else '' }}"
+
+# Disable logging for sensitive data
+# Type: Boolean
+freeipa_client_no_log: true

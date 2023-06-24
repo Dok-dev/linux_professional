@@ -1,0 +1,18 @@
+---
+- name: Restart service cron
+  ansible.builtin.systemd:
+    state: restarted
+    daemon_reload: true
+    name: crond
+
+- name: Restart sssd service
+  ansible.builtin.systemd:
+    enabled: true
+    name: sssd
+    state: restarted
+
+- name: Restart chronyd
+  ansible.builtin.service: 
+    name: chronyd
+    state: restarted
+    enabled: true

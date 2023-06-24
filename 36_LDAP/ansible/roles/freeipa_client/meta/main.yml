@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: freeipa_client
+  namespace: otus
+  author: Timofey Biriukov
+  description: Install and configure Free IPA client
+  company: ""
+  license: MIT
+  min_ansible_version: 2.7
+  platforms:
+    - name: CentOS
+      versions:
+        - 8
+
+  galaxy_tags: []
+dependencies: []

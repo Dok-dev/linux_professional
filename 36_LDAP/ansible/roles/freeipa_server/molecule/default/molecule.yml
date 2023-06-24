@@ -1,0 +1,23 @@
+---
+####### For testing in vagrant ##########
+dependency:
+  name: galaxy
+driver:
+  name: vagrant
+  provider:
+    name: virtualbox
+# lint:
+#   name: yamllint
+platforms:
+  - name: instance
+    box: centos8
+    memory: 2048
+    cpus: 2
+    instance_raw_config_args:
+      - "vm.network 'forwarded_port', guest: 80, host: 8080"
+provisioner:
+  name: ansible
+  lint:
+    name: ansible-lint
+verifier:
+  name: ansible

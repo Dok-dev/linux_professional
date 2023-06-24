@@ -1,0 +1,12 @@
+ansible_port: 22
+ansible_user: vagrant
+# ansible_python_interpreter: /usr/bin/python3
+
+freeipa_server_realm: "OTUS.LAN"
+freeipa_server_domain: "otus.lan"
+
+freeipa_client_fqdn: "{{ inventory_hostname }}"
+freeipa_client_realm: "OTUS.LAN"
+freeipa_client_master_fqdn: "ipa.otus.lan"
+freeipa_client_domain: "otus.lan"
+freeipa_client_additional_resolv_ns: ["192.168.57.10", "77.88.8.8"]

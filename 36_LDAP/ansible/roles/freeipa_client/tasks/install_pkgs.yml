@@ -1,0 +1,42 @@
+---
+- name: Disable mirrorlist in repos on CentOS 8
+  ansible.builtin.replace:
+    path: "{{ item }}"
+    regexp: '^mirrorlist'
+    replace: '#mirrorlist'
+  with_items:
+    - /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+    - /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
+    - /etc/yum.repos.d/CentOS-Linux-ContinuousRelease.repo
+    - /etc/yum.repos.d/CentOS-Linux-Devel.repo
+    - /etc/yum.repos.d/CentOS-Linux-Extras.repo
+    - /etc/yum.repos.d/CentOS-Linux-FastTrack.repo
+    - /etc/yum.repos.d/CentOS-Linux-HighAvailability.repo
+    - /etc/yum.repos.d/CentOS-Linux-Plus.repo
+    - /etc/yum.repos.d/CentOS-Linux-PowerTools.repo
+
+- name: Enable baseurl in repos on CentOS 8
+  ansible.builtin.replace:
+    path: "{{ item }}"
+    regexp: '^#baseurl=http://mirror.centos.org'
+    replace: 'baseurl=http://vault.centos.org'
+  with_items:
+    - /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+    - /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
+    - /etc/yum.repos.d/CentOS-Linux-ContinuousRelease.repo
+    - /etc/yum.repos.d/CentOS-Linux-Devel.repo
+    - /etc/yum.repos.d/CentOS-Linux-Extras.repo
+    - /etc/yum.repos.d/CentOS-Linux-FastTrack.repo
+    - /etc/yum.repos.d/CentOS-Linux-HighAvailability.repo
+    - /etc/yum.repos.d/CentOS-Linux-Plus.repo
+    - /etc/yum.repos.d/CentOS-Linux-PowerTools.repo
+
+- name: Install packages
+  ansible.builtin.dnf:
+    name: "{{ item }}"
+    state: present
+    disable_gpg_check: true
+  with_items:
+    - chrony
+    - freeipa-client
+  notify: Restart chronyd

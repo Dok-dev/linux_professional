@@ -1,0 +1,16 @@
+---
+# FreeIPA master server ip is needed for task "Create resolv.conf"
+# task run if variable freeipa_master_server_ip not equal any ip
+
+- name: Try to get FreeIPA master server ip from inventory, when freeipa_master_server_ip not set or uncorrect
+  ansible.builtin.set_fact:
+    freeipa_master_server_ip: "{{ hostvars[groups['freeipa_server'].0]['ansible_host'] }}"
+  when:
+    - not freeipa_master_server_ip or freeipa_master_server_ip is not regex('\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b')
+    - groups['freeipa_server'] | default([]) | length > 0
+
+- name: Check variables
+  ansible.builtin.assert:
+    that:
+      - freeipa_master_server_ip  is regex ('\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b')
+    fail_msg: "Variable freeipa_master_server_ip is not valid"

@@ -1,0 +1,37 @@
+---
+- name: Restart service cron
+  ansible.builtin.systemd:
+    state: restarted
+    daemon_reload: true
+    name: crond
+
+- name: Restart ipa services
+  ansible.builtin.systemd:
+    daemon_reload: true
+    enabled: true
+    name: ipa
+    state: restarted
+
+- name: Restart oddjob service
+  ansible.builtin.systemd:
+    enabled: true
+    name: oddjobd
+    state: restarted
+
+- name: Restart apache2 service
+  ansible.builtin.systemd:
+    enabled: true
+    name: apache2
+    state: restarted
+
+- name: Restart dirsrv
+  ansible.builtin.systemd:
+    name: "dirsrv@{{ freeipa_server_realm | replace ('.','-') }}"
+    state: restarted
+    daemon_reload: yes
+
+- name: Restart chronyd
+  ansible.builtin.service: 
+    name: chronyd
+    state: restarted
+    enabled: true

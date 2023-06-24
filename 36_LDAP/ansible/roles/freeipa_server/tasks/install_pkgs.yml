@@ -1,0 +1,74 @@
+---
+- name: Disable mirrorlist in repos on CentOS 8
+  ansible.builtin.replace:
+    path: "{{ item }}"
+    regexp: '^mirrorlist'
+    replace: '#mirrorlist'
+  with_items:
+    - /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+    - /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
+    - /etc/yum.repos.d/CentOS-Linux-ContinuousRelease.repo
+    - /etc/yum.repos.d/CentOS-Linux-Devel.repo
+    - /etc/yum.repos.d/CentOS-Linux-Extras.repo
+    - /etc/yum.repos.d/CentOS-Linux-FastTrack.repo
+    - /etc/yum.repos.d/CentOS-Linux-HighAvailability.repo
+    - /etc/yum.repos.d/CentOS-Linux-Plus.repo
+    - /etc/yum.repos.d/CentOS-Linux-PowerTools.repo
+
+- name: Enable baseurl in repos on CentOS 8
+  ansible.builtin.replace:
+    path: "{{ item }}"
+    regexp: '^#baseurl=http://mirror.centos.org'
+    replace: 'baseurl=http://vault.centos.org'
+  with_items:
+    - /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+    - /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
+    - /etc/yum.repos.d/CentOS-Linux-ContinuousRelease.repo
+    - /etc/yum.repos.d/CentOS-Linux-Devel.repo
+    - /etc/yum.repos.d/CentOS-Linux-Extras.repo
+    - /etc/yum.repos.d/CentOS-Linux-FastTrack.repo
+    - /etc/yum.repos.d/CentOS-Linux-HighAvailability.repo
+    - /etc/yum.repos.d/CentOS-Linux-Plus.repo
+    - /etc/yum.repos.d/CentOS-Linux-PowerTools.repo
+
+- name: Install packages
+  ansible.builtin.dnf:
+    name: "{{ item }}"
+    state: present
+    disable_gpg_check: true
+  with_items:
+    - chrony
+    - "@idm:DL1"
+    - ipa-server
+    - python3-pip
+    - python3-setuptools
+  notify: Restart chronyd
+
+- name: Install FreeIPA server DNS package
+  ansible.builtin.yum:
+      name: freeipa-server-dns
+      state: latest 
+  when: freeipa_server_install_dns
+
+# Module pexpect need for task "Get ipa admin ticket"
+# cryptography - cert gen,  pyopenssl - p12 gen
+- name: Install Pexpect, cryptography, pyopenssl
+  ansible.builtin.pip:
+    name:
+      - pexpect==4.8.0
+      - cryptography==3.2.1
+      - pyopenssl==20.0.1
+    state: present
+    executable: pip3
+  when: freeipa_pip_repo_url | length == 0
+
+- name: Offline install Pexpect, cryptography, pyopenssl
+  ansible.builtin.pip:
+    name:
+      - pexpect==4.8.0
+      - cryptography==3.2.1
+      - pyopenssl==20.0.1
+    state: present
+    executable: pip3
+    extra_args: -i {{ freeipa_pip_repo_url }} --trusted-host {{ freeipa_pip_repo_trusted_host }}
+  when: freeipa_pip_repo_url | length > 0

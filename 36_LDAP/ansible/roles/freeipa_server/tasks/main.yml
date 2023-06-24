@@ -1,0 +1,49 @@
+---
+- name: Set hostname
+  ansible.builtin.hostname:
+    use: systemd
+    name: "{{ inventory_hostname }}"
+  
+- name: Set time zone
+  ansible.builtin.copy:
+    remote_src: True
+    src: /usr/share/zoneinfo/Europe/Moscow
+    dest: /etc/localtime
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart service cron
+
+- name: Disable firewalld
+  ansible.builtin.service:
+    name: firewalld
+    state: stopped
+    enabled: false
+
+# - name: Set firewalld rools
+#   ansible.builtin.shell: |
+#     firewall-cmd --permanent --add-port=53/{tcp,udp} --add-port={80,443}/tcp --add-port={88,464}/{tcp,udp} --add-port=123/udp --add-port={389,636}/tcp
+#     firewall-cmd --reload
+
+- name: Put SELinux in disabled mode
+  ansible.posix.selinux:
+    policy: targeted
+    state: disabled
+
+#Отключение SElinux до перезагрузки
+- name: Disable SElinux now
+  shell: setenforce 0
+
+- name: Set /etc/hosts
+  template:
+    src: templates/hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: 0644
+
+- ansible.builtin.include_tasks: install_pkgs.yml
+
+- ansible.builtin.include_tasks: freeipa_server_install.yml
+
+- ansible.builtin.include_tasks: max_file_descriptors.yml
