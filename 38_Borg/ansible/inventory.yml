@@ -1,0 +1,11 @@
+backup_servers:
+  hosts:
+    backup:
+        ansible_host: 192.168.60.160
+        ansible_private_key_file: .vagrant/machines/backup/virtualbox/private_key
+
+client_servers:
+  hosts:
+    client:
+        ansible_host: 192.168.60.150
+        ansible_private_key_file: .vagrant/machines/client/virtualbox/private_key

@@ -1,0 +1,141 @@
+---
+
+
+- name: Install common packages and customize 
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+
+  - ansible.builtin.include_tasks: tasks/common.yml
+
+
+- name: Set up Borg backup server
+  hosts: backup
+  become: true
+  gather_facts: false
+
+  tasks:
+
+  - name: Create group 'borg'
+    group:
+      name: borg
+      state: present
+
+  - name: Add the user 'borg'
+    ansible.builtin.user:
+      name: borg
+      comment: borg backup
+      group: borg
+
+  - name: Create backup directory
+    ansible.builtin.file:
+      path: /var/backup
+      state: directory
+      owner: borg
+      group: borg
+      mode: 0770
+
+  - name: Create a new ext4 primary partition
+    community.general.parted:
+      device: /dev/sdb
+      number: 1
+      state: present
+      fs_type: ext4
+
+  - name: Create a ext4 filesystem on /dev/sdb1
+    community.general.filesystem:
+      fstype: ext4
+      dev: /dev/sdb1
+
+  - name: Mount backup volume
+    ansible.posix.mount:
+      path: /var/backup
+      src: /dev/sdb1
+      fstype: ext4
+      state: mounted
+
+  - name: Remove unnecessary directory
+    ansible.builtin.file:
+      path: /var/backup/lost+found
+      state: absent
+
+  - name: Set permissions to backup directory
+    ansible.builtin.file:
+      path: /var/backup
+      state: directory
+      recurse: true
+      owner: borg
+      group: borg
+      mode: 0770
+
+- name: Set up client server
+  hosts: client
+  become: true
+  gather_facts: false
+
+  tasks:
+
+  - ansible.builtin.include_tasks: tasks/ssh_connetion.yml
+
+  # - name: Chek repo status
+  #   ansible.builtin.find:
+  #     paths: /var/backup/
+  #     file_type: any
+  #     hidden: true
+  #   delegate_to: backup
+  #   register: out
+
+  # - ansible.builtin.fail:
+  #     msg: the repo /var/backup/ already exist
+  #   when: out.matched >= 1
+
+  # - name: Client | export passphrase
+  #   ansible.builtin.lineinfile:
+  #     dest: "/root/.borg.passphrase"
+  #     state: "present"
+  #     line: 'export BORG_PASSPHRASE="{{ borgbackup_passphrase }}"'
+  #     create: true
+
+  - name: Create borg repo
+    ansible.builtin.shell:
+      borg init --encryption=repokey borg@192.168.60.160:/var/backup/
+    environment:
+        BORG_PASSPHRASE: "{{ borgbackup_passphrase }}"
+    # when: out.matched <= 1
+    register: backup_init
+    changed_when: "'Write down the passphrase' in backup_init.stderr"
+
+  - name: Create systemd unit
+    ansible.builtin.template:
+      src: templates/borg-backup.service.j2
+      dest: /etc/systemd/system/borg-backup.service
+      owner: root
+      group: root
+      mode: 0644
+    become: true
+
+  - name: Create systemd timer
+    ansible.builtin.template:
+      src: templates/borg-backup.timer
+      dest: /etc/systemd/system/borg-backup.timer
+      owner: root
+      group: root
+      mode: 0644
+    become: true
+
+  - name: Restart borg-backup timer
+    ansible.builtin.systemd:
+      state: restarted
+      name: borg-backup.timer
+      enabled: true
+      daemon_reload: true
+    become: true
+
+  - name: Restart borg-backup service
+    ansible.builtin.systemd:
+      state: restarted
+      name: borg-backup.timer
+      enabled: true
+    become: true

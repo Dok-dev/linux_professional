@@ -1,0 +1,5 @@
+---
+ansible_port: 22
+ansible_user: vagrant
+borgbackup_passphrase: "12345FGx8"
+# openvpnserver: "{{ hostvars['server.loc'].ansible_default_ipv4.address }}"

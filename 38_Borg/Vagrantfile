@@ -1,0 +1,32 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+Vagrant.configure(2) do |config|
+    config.vm.box = "centos/7"
+
+    config.vm.define "backup" do |server|
+        server.vm.hostname = "backup"
+        server.vm.network "private_network", ip: "192.168.60.160"
+        server.vm.provider :virtualbox do |vb|
+            vb.customize ["modifyvm", :id, "--memory", "1024"]
+            vb.customize ["storagectl", :id, "--name", "SATA", "--add", "sata" ]
+            unless File.exist?('./sata2.vdi')
+                vb.customize ['createhd', '--filename', './sata2.vdi', '--variant', 'Fixed', '--size', 2000]
+            end
+            vb.customize ['storageattach', :id,  '--storagectl', 'SATA', '--port', 2, '--device', 0, '--type', 'hdd', '--medium', './sata2.vdi']
+        end
+    end
+    
+    config.vm.define "client" do |client|
+        client.vm.hostname = "client"
+        client.vm.network "private_network", ip: "192.168.60.150"
+
+        client.vm.provision "playbook1", type:'ansible' do |ansible|
+            ansible.playbook = "ansible/provision.yml"
+            ansible.inventory_path = "ansible/inventory.yml"
+            ansible.galaxy_roles_path = "./roles"
+            ansible.host_key_checking = "false"
+            ansible.limit = "all"
+            ansible.galaxy_command = 'ansible-galaxy collection install community.general community.crypto'
+        end
+    end
+end
