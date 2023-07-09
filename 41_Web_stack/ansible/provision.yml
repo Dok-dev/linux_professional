@@ -1,0 +1,88 @@
+---
+
+- name: Install DynamicWeb stack
+  hosts: DynamicWeb
+  become: true 
+  gather_facts: false
+
+  tasks:
+  - name: Install docker packages # устанавливаем пакеты необходимые для установки докера
+    apt:
+      name: "{{ item }}"
+      state: present
+      update_cache: yes
+    with_items:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+    tags:
+      - docker
+  
+  - name: Add Docker s official GPG key
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+    tags:
+      - docker
+
+  - name: Verify that we have the key with the fingerprint
+    apt_key:
+      id: 0EBFCD88
+      state: present
+    tags:
+      - docker
+  
+  - name: Set up the stable repository # добавляем репозиторий докера
+    apt_repository:
+      repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+      state: present
+      update_cache: yes
+    tags:
+      - docker
+  
+  - name: Update apt packages
+    apt:
+      update_cache: yes
+    tags:
+      - docker
+  
+  - name: Install docker
+    apt:
+      name: docker-ce
+      state: present
+      update_cache: yes
+    tags:
+      - docker
+  
+  - name: Add remote "vagrant" user to "docker" group
+    user:
+      name: vagrant
+      groups: 
+        - "docker"
+      append: true # for do not removing user from all other groups
+    tags:
+      - docker
+
+  - name: Install docker-compose 
+    get_url:
+      url : https://github.com/docker/compose/releases/download/1.25.1-rc1/docker-compose-Linux-x86_64
+      dest: /usr/local/bin/docker-compose
+      mode: 0777
+
+  - name: Copy project # Копируем проект с хост машины в созданную через vagrant
+    copy:
+      src: ../docker
+      dest: /home/vagrant
+      # directory_mode: true
+      owner: vagrant
+      group: vagrant
+      mode: '0770'
+
+  - name: reset ssh connection # чтобы применились права на использование docker, необходимо перелогиниться
+    meta: reset_connection
+
+  - name: Run container
+    shell:
+      cmd: "docker-compose -f docker-compose.yml up -d"
+      chdir: /home/vagrant/docker
