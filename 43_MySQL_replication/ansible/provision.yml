@@ -1,0 +1,350 @@
+---
+
+- name: Install common packages and customize 
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+
+  - ansible.builtin.include_tasks: tasks/common.yml
+
+  - name: Install the Percona yum repository
+    ansible.builtin.yum:
+      name:
+        - https://repo.percona.com/yum/percona-release-latest.noarch.rpm
+      state: present
+
+  - name: Enable the Percona Server 5.7 repository
+    ansible.builtin.command: percona-release setup ps57
+
+  - name: Install packages
+    ansible.builtin.yum:
+      name:
+        - Percona-Server-server-57
+        - python3-pip
+        - MySQL-python
+      state: present
+      update_cache: true
+    notify: Restart mysql service
+
+  - name: Copy percona config files
+    ansible.builtin.template:
+      src: "templates/my.cnf.d/{{ item }}.j2"
+      dest: "/etc/my.cnf.d/{{ item }}.cnf"
+      owner: root
+      group: root
+      mode: '0644'
+    with_items:
+      - 01-basics
+      - 02-max-connections
+      - 03-performance
+      - 04-slow-query
+      - 05-binlog
+    notify: Restart mysql service
+
+  - name: Flush handlers
+    ansible.builtin.meta: flush_handlers
+
+  - name: Get mysql password
+    ansible.builtin.shell:
+      cmd: "cat /var/log/mysqld.log | grep 'root@localhost:' | awk '{print $11}'"
+    register: mysql_pass
+
+  - name: Get mysql_history status
+    ansible.builtin.stat:
+      path: "/root/.mysql_pass_changed"
+    register: mysql_history
+
+  - name: Change mysql root user password
+    ansible.builtin.shell: "{{ item }}"
+    with_items:
+      - "/bin/mysqladmin -u root -p'{{ mysql_pass.stdout }}' password '{{ mysql_root_pass }}'"
+      - "touch /root/.mysql_pass_changed"
+    when: not mysql_history.stat.exists
+
+  # - name: Change mysql root user password
+  #   community.mysql.mysql_query:
+  #     login_user: root
+  #     login_password: "{{ mysql_pass.stdout }}"
+  #     query: "ALTER USER USER() IDENTIFIED BY '{{ mysql_root_pass }}'"
+  #     login_unix_socket: /var/lib/mysql/mysql.sock
+  #   register: alter_result
+  #   when: not mysql_history.stat.exists
+
+  # - name: Set changed password flag
+  #   ansible.builtin.shell: "touch /root/.mysql_pass_changed"
+  #   when: alter_result.changed
+
+  - name: Find user repl
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      query: SELECT user,host FROM mysql.user
+      login_unix_socket: /var/lib/mysql/mysql.sock
+    register: mysql_users
+
+  - name: Create user
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      query: "{{ item }}"
+      login_unix_socket: /var/lib/mysql/mysql.sock
+    with_items:
+      - "CREATE USER 'repl'@'%' IDENTIFIED BY '{{ mysql_repl_pass }}'"
+      - "GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%' IDENTIFIED BY '{{ mysql_repl_pass }}'"
+    when: (mysql_users.query_result[0] | selectattr(search_key,'equalto',search_val) | list | count) < 1
+    vars:
+      search_key: user
+      search_val: repl
+
+  - name: Get mysql server info
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      query: "{{ item }}"
+      login_unix_socket: /var/lib/mysql/mysql.sock
+    register: mysql_info
+    with_items:
+      - SELECT @@server_id
+      - SHOW VARIABLES LIKE 'gtid_mode'
+
+  - name: Print mysql server @server_id
+    ansible.builtin.debug:
+      var: mysql_info.results[0].query_result[0]
+
+  - name: Print mysql gtid_mode
+    ansible.builtin.debug:
+      var: mysql_info.results[1].query_result[0]
+
+  - name: Print mysql users
+    ansible.builtin.debug:
+      var: mysql_users.query_result[0]
+
+  handlers:
+
+  - name: Restart mysql service
+    ansible.builtin.systemd:
+      state: restarted
+      name: mysql
+      enabled: true
+    become: true
+
+
+
+- name: Set up master server
+  hosts: master
+  become: true
+  gather_facts: false
+
+  tasks:
+
+  - name: Find database bet
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      query: SHOW DATABASES
+      login_unix_socket: /var/lib/mysql/mysql.sock
+    register: databases
+
+  - name: Print SHOW TABLES
+    ansible.builtin.debug:
+      var: databases.query_result[0]
+
+  - name: Copy database dump
+    ansible.builtin.copy:
+      src: templates/bet.dmp
+      dest: /home/vagrant/bet.dmp
+      owner: vagrant
+      group: vagrant
+      mode: '0774'
+
+  - block:
+
+    - name: Create database
+      community.mysql.mysql_query:
+        login_user: root
+        login_password: "{{ mysql_root_pass }}"
+        query: CREATE DATABASE bet
+        login_unix_socket: /var/lib/mysql/mysql.sock
+
+    # - name: Restore database from backup
+    #   ansible.builtin.shell:
+    #     cmd: "mysql -uroot -p'{{ mysql_root_pass }}' -D bet < /home/vagrant/bet.dmp"
+
+    - name: Restore database from backup
+      community.mysql.mysql_db:
+        state: import
+        login_user: root
+        login_password: "{{ mysql_root_pass }}"
+        name: bet
+        target: /home/vagrant/bet.dmp
+
+    when: (databases.query_result[0] | selectattr(search_key,'equalto',search_val) | list | count) < 1
+    vars:
+      search_key: Database
+      search_val: bet
+
+  - name: Get tables from restored database
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      login_db: bet
+      query: SHOW TABLES
+    register: show_tables
+  
+  - name: Print SHOW TABLES from restored database
+    ansible.builtin.debug:
+      msg: "{{ show_tables.query_result[0] }}"
+
+  # - name: Dump database for slave
+  #   ansible.builtin.command:
+  #     cmd: >
+  #       "/bin/mysqldump --all-databases --triggers --routines --master-data
+  #       --ignore-table=bet.events_on_demand --ignore-table=bet.v_same_event
+  #       -uroot -p'{{ mysql_root_pass }}' --set-gtid-purged=OFF --result-file=/home/vagrant/master.sql"
+
+  - name: Dump database for slave
+    community.mysql.mysql_db:
+      state: dump
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      name: bet
+      target: /home/vagrant/master.sql
+      dump_extra_args: "--triggers --routines --master-data --ignore-table=bet.events_on_demand --ignore-table=bet.v_same_event --set-gtid-purged=OFF"
+
+  - name: Change permission on dump file
+    ansible.builtin.file:
+      path: /home/vagrant/master.sql
+      owner: "vagrant"
+      group: "vagrant"
+      mode: '0640'
+
+
+- name: Set up slave server
+  hosts: slave
+  become: true
+  gather_facts: false
+
+  tasks:
+
+  - name: Find database "bet"
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      query: SHOW DATABASES
+      login_unix_socket: /var/lib/mysql/mysql.sock
+    register: databases
+
+  - block:
+
+    - name: Copy private key for slave to master
+      ansible.builtin.copy:
+        src: ../.vagrant/machines/slave/virtualbox/private_key
+        dest: /home/vagrant/server_key
+        owner: vagrant
+        group: vagrant
+        mode: '0600'
+      delegate_to: master
+
+    - name: Transfer database dump from master
+      ansible.builtin.synchronize:
+        src: /home/vagrant/master.sql
+        dest: /home/vagrant/master.sql
+        private_key: /home/vagrant/server_key
+        rsync_opts:
+          - "-I --checksum --rsync-path='sudo -u root rsync'"
+      delegate_to: master
+
+    - name: Create database
+      community.mysql.mysql_query:
+        login_user: root
+        login_password: "{{ mysql_root_pass }}"
+        query: CREATE DATABASE bet
+        login_unix_socket: /var/lib/mysql/mysql.sock
+
+    # - name: Restore database on slave
+    #   community.mysql.mysql_query:
+    #     login_user: root
+    #     login_password: "{{ mysql_root_pass }}"
+    #     login_db: bet
+    #     query: SOURCE /home/vagrant/master.sql
+    #     login_unix_socket: /var/lib/mysql/mysql.sock
+
+    - name: Restore database on slave
+      community.mysql.mysql_db:
+        state: import
+        login_user: root
+        login_password: "{{ mysql_root_pass }}"
+        name: bet
+        target: /home/vagrant/master.sql
+
+    when: (databases.query_result[0] | selectattr(search_key,'equalto',search_val) | list | count) < 1
+    vars:
+      search_key: Database
+      search_val: bet
+
+  - name: Get tables from database "bet"
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      login_db: bet
+      query: SHOW TABLES
+    register: show_tables
+  
+  - name: Print SHOW TABLES from database "bet"
+    ansible.builtin.debug:
+      msg: "{{ show_tables.query_result[0] }}"
+
+  - name: Change master host on slave
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      query:
+        - STOP SLAVE
+        - "CHANGE MASTER TO MASTER_HOST = '192.168.11.150', MASTER_PORT = 3306, MASTER_USER = 'repl', MASTER_PASSWORD = '{{ mysql_repl_pass }}', MASTER_AUTO_POSITION = 1"
+        - START SLAVE
+      single_transaction: true
+      login_unix_socket: /var/lib/mysql/mysql.sock
+
+  - name: Get slave status
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      query: SHOW SLAVE STATUS
+      login_unix_socket: /var/lib/mysql/mysql.sock
+    register: slave_status
+
+  - name: Print slave status
+    ansible.builtin.debug:
+      msg: "{{ slave_status.query_result[0] }}"
+
+  - name: Test insert new data to master
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      login_db: bet
+      query:
+        - INSERT INTO bookmaker (id,bookmaker_name) VALUES(1,'1xbet')
+        - SELECT * FROM bookmaker
+      login_unix_socket: /var/lib/mysql/mysql.sock
+    register: new_master_data
+    delegate_to: master
+
+  - name: Print master new data
+    ansible.builtin.debug:
+      msg: "{{ new_master_data }}"
+
+  - name: Test get new data from slave
+    community.mysql.mysql_query:
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      login_db: bet
+      query: SELECT * FROM bookmaker
+      login_unix_socket: /var/lib/mysql/mysql.sock
+    register: new_masre_data
+    delegate_to: master
+
+  - name: Print slave new data
+    ansible.builtin.debug:
+      msg: "{{ new_masre_data.query_result[0] }}"

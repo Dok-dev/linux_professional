@@ -1,0 +1,6 @@
+---
+ansible_port: 22
+ansible_user: vagrant
+mysql_root_pass: "V_AuvAaTN7g9"
+mysql_repl_pass: "R_AuvAaTN7g9"
+ignore_tables: ""

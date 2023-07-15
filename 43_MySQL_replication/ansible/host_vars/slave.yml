@@ -1,0 +1,5 @@
+---
+server_id: 2
+ignore_tables: |
+  replicate-ignore-table=bet.events_on_demand
+  replicate-ignore-table=bet.v_same_event
