@@ -82,18 +82,14 @@
   - name: Create bakup from node1
     become_user: barman
     shell: |
-      barman backup node1
       #  WAL обычно архивируются только после их заполнения, и если ваш сервер простаивает, этого никогда не произойдет
       barman switch-xlog --force --archive node1
+      barman backup node1
     register: backup_node1
 
   - name: Print barman backup node1 info
     ansible.builtin.debug:
       var: backup_node1.stdout
-
-  - name: Sleep for 15 to get backup coditions
-    ansible.builtin.wait_for:
-      timeout: 15
 
   - name: Barman check node1
     become_user: barman

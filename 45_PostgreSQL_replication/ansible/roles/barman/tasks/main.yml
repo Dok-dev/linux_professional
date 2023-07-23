@@ -108,7 +108,7 @@
 
   #  Копируем ключ с barman на node1
   - name: transfer public key to barman
-    delegate_to: barman
+    delegate_to: "{{ barman_node_name }}"
     authorized_key:
       key: "{{ ssh_keys.stdout }}"
       comment: "{{ansible_hostname}}"
@@ -123,7 +123,7 @@
 
  #  Копируем ключ с node1 на barman
   - name: transfer public key to barman
-    delegate_to: node1
+    delegate_to: "{{ barman_master_node }}"
     authorized_key:
       key: "{{ ssh_keys.stdout }}"
       comment: "{{ansible_hostname}}"
@@ -210,9 +210,9 @@
       mode: '0755'
     when: barman_node
 
-  - name: barman switch-wal node1
+  - name: barman switch-wal "{{ barman_master_node }}"
     become_user: barman
-    shell: barman switch-wal node1
+    shell: barman switch-wal "{{ barman_master_node }}"
     when: barman_node
 
   - name: barman cron
