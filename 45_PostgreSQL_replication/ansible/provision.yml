@@ -1,0 +1,160 @@
+---
+- name: Install base tools
+  hosts: all
+  become: true
+  tasks:
+  - name: install base tools
+    dnf:
+      name:
+        - vim
+        - telnet
+      state: present
+      update_cache: true
+
+- name: PostgresSQL 14 install and set up replication
+  hosts: node1, node2
+  become: true
+  roles:
+  - postgresql
+  - postgres_replication
+
+
+- name: Replication tests
+  hosts: node1
+  become: true
+
+  tasks:
+
+  - name: Create test database on node1
+    become_user: postgres
+    community.postgresql.postgresql_db:
+      name: otus_test
+      encoding: UTF-8
+      template: template0
+      state: present
+
+  - name: Collect databases from node2
+    become_user: postgres
+    community.postgresql.postgresql_info:
+      filter: databases
+    register: node2_databases
+    delegate_to: node2
+
+  - name: Print databases list from node2
+    ansible.builtin.debug:
+      var: node2_databases.databases
+
+  - name: Collect replacation info from node1
+    become_user: postgres
+    community.postgresql.postgresql_query:
+      #db: replication
+      query: SELECT * FROM pg_stat_replication
+    register: node1_replication_info
+
+  - name: Collect replacation info from node1
+    become_user: postgres
+    community.postgresql.postgresql_query:
+      #db: replication
+      query: SELECT * FROM pg_stat_wal_receiver
+    register: node2_replication_info
+    delegate_to: node2
+
+  - name: Print replacation info
+    ansible.builtin.debug:
+      var: "{{ item }}"
+    with_items:
+      - node1_replication_info
+      - node2_replication_info
+ 
+
+- name: Setup barman
+  hosts: all
+  become: true
+  roles:
+  - barman
+
+
+- name: Backup tests
+  hosts: barman
+  become: true
+  tasks:
+
+  - name: Create bakup from node1
+    become_user: barman
+    shell: |
+      barman backup node1
+      #  WAL обычно архивируются только после их заполнения, и если ваш сервер простаивает, этого никогда не произойдет
+      barman switch-xlog --force --archive node1
+    register: backup_node1
+
+  - name: Print barman backup node1 info
+    ansible.builtin.debug:
+      var: backup_node1.stdout
+
+  - name: Sleep for 15 to get backup coditions
+    ansible.builtin.wait_for:
+      timeout: 15
+
+  - name: Barman check node1
+    become_user: barman
+    shell: barman check node1
+    register: check_node1
+
+  - name: Print barman check node1 info
+    ansible.builtin.debug:
+      var: check_node1.stdout
+
+  - name: Barman list backups
+    become_user: barman
+    shell: barman list-backup node1
+    register: backup_list
+
+  - name: Print barman backups list
+    ansible.builtin.debug:
+      var: backup_list.stdout
+
+
+##  Examples for future:
+# ---
+# - name: Add post transport maps table
+#   community.postgresql.postgresql_table:
+#     login_host: "{{ post_db_host }}"
+#     port: "{{ rupost_db_port }}"
+#     login_user: "{{ rupost_db_user }}"
+#     login_password: "{{ rupost_db_user_password }}"
+#     db: post_custom
+#     name: rp_transport_maps
+#     columns:
+#       - address VARCHAR (255) PRIMARY KEY
+#       - transport VARCHAR (255) NOT NULL DEFAULT 'smtp:[mail.linux.ru]:25'
+#     state: present
+#   become: false
+#   delegate_to: localhost
+
+# - name: Add default transport for domain
+#   community.postgresql.postgresql_query:
+#     login_host: "{{ post_db_host }}"
+#     port: "{{ rupost_db_port }}"
+#     login_user: "{{ rupost_db_user }}"
+#     login_password: "{{ rupost_db_user_password }}"
+#     db: post_custom
+#     query: >-
+#       SELECT * FROM rp_transport_maps
+#       WHERE address = 'linux.ru'
+#   register: psqlsql_query
+#   become: false
+#   delegate_to: localhost
+
+# - name: Add default transport for domain
+#   community.postgresql.postgresql_query:
+#     login_host: "{{ post_db_host }}"
+#     port: "{{ rupost_db_port }}"
+#     login_user: "{{ rupost_db_user }}"
+#     login_password: "{{ rupost_db_user_password }}"
+#     db: post_custom
+#     query: >-
+#       INSERT INTO rp_transport_maps (address, transport)
+#       VALUES ('linux.ru', 'lmtp:inet:127.0.0.1:24')
+#   when: psqlsql_query.rowcount == 0
+#   become: false
+#   delegate_to: localhost

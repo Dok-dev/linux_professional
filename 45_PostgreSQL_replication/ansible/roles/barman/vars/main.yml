@@ -1,0 +1,4 @@
+---
+# vars file for barman
+master_node: "{{ true if ansible_host == master_ip else false }}"
+barman_node: "{{ true if ansible_host == barman_ip else false }}"

@@ -1,0 +1,19 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+Vagrant.configure(2) do |config|
+  config.vm.box = "centos/7"
+
+  config.vm.define "postgresql" do |box|
+    box.vm.hostname = "postgresql"
+    box.vm.network "private_network", ip: "192.168.56.10"
+
+    box.vm.provision "playbook1", type:'ansible' do |ansible|
+      ansible.playbook = "ansible/provision.yml"
+      ansible.inventory_path = "ansible/inventory.yml"
+      ansible.galaxy_roles_path = "./roles"
+      ansible.host_key_checking = "false"
+      ansible.limit = "all"
+      ansible.galaxy_command = 'ansible-galaxy collection install community.general community.postgresql'
+    end
+  end
+end

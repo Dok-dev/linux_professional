@@ -1,0 +1,5 @@
+[all]
+postgresql ansible_host=192.168.56.10
+
+[all:vars]
+ansible_user=vagrant

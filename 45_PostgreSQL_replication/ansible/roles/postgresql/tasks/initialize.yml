@@ -1,0 +1,28 @@
+---
+- name: Set PostgreSQL environment variables.
+  ansible.builtin.template:
+    src: postgres.sh.j2
+    dest: /etc/profile.d/postgres.sh
+    mode: 0644
+  notify: restart postgresql
+
+# - name: Ensure PostgreSQL data directory exists.
+#   ansible.builtin.file:
+#     path: "{{ postgresql_data_dir }}"
+#     owner: "{{ postgresql_user }}"
+#     group: "{{ postgresql_group }}"
+#     state: directory
+#     mode: 0700
+
+# Проверяем, что postgres на хосте ещё не инициализирован
+- name: Check Postgres init 
+  stat:
+    path: "{{ postgresql_data_dir }}/pg_stat"
+  register: stat_result
+
+- name: Ensure PostgreSQL database is initialized.
+  ansible.builtin.shell: "{{ postgresql_bin_path }}/postgresql-{{ postgresql_version }}-setup initdb"
+  when: not stat_result.stat.exists
+  become: true
+  vars:
+    ansible_ssh_pipelining: true

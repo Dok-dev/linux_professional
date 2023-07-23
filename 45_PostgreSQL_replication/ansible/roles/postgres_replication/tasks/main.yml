@@ -1,0 +1,79 @@
+---
+# Установка python-пакетов для модулей psql
+- name: install base tools
+  ansible.builtin.dnf:
+    name:
+      - python3-pexpect.noarch
+      - python3-psycopg2
+    state: present
+    update_cache: true
+
+- name: Print master_ip status
+  ansible.builtin.debug:
+    var: master_node
+
+#CREATE USER replicator WITH REPLICATION Encrypted PASSWORD 'Otus2022!';
+- name: Create replicator user
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: replication
+    password: '{{ replicator_password }}'
+    role_attr_flags: REPLICATION 
+  ignore_errors: true
+  when: master_node
+
+#Остановливаем postgresql-14 на хосте node2
+- name: stop postgresql-server on node2
+  ansible.builtin.service: 
+    name: postgresql-14
+    state: stopped
+  when: not master_node
+
+#Копиуем конфигурационный файл postgresql.conf
+- name: copy postgresql.conf
+  ansible.builtin.template:
+    src: postgresql.conf.j2
+    dest: /var/lib/pgsql/14/data/postgresql.conf
+    owner: postgres
+    group: postgres
+    mode: '0600'
+
+#Копиуем конфигурационный файл pg_hba.conf
+- name: copy pg_hba.conf
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: /var/lib/pgsql/14/data/pg_hba.conf
+    owner: postgres
+    group: postgres
+    mode: '0600'
+
+  #Перезапускаем службу  postgresql-14
+- name: restart postgresql-server on node1
+  ansible.builtin.service: 
+    name: postgresql-14
+    state: restarted
+  when: master_node
+
+#Удаляем содержимое каталога /var/lib/pgsql/14/data/
+- name: Remove files from data catalog
+  ansible.builtin.file:
+    path: /var/lib/pgsql/14/data/
+    state: absent
+  when: not master_node
+
+#Копируем данные с node1 на node2
+- name: copy files from master to slave
+  become_user: postgres
+  ansible.builtin.expect:
+    command: 'pg_basebackup -h {{ master_ip }} -U  replication -p 5432 -D /var/lib/pgsql/14/data/ -R -P'
+    responses: 
+      '.*Password*': "{{ replicator_password }}"
+  when: not master_node
+
+#Запускаем службу postgresql-14 на хосте node2
+- name: start postgresql-server on node2
+  ansible.builtin.service: 
+    name: postgresql-14
+    state: started
+  when: not master_node
+
