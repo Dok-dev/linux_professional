@@ -1,0 +1,19 @@
+[barman]
+#Указываем каталог, в котором будут храниться бекапы
+barman_home = /var/lib/barman
+#Указываем каталог, в котором будут храниться файлы конфигурации бекапов
+configuration_files_directory = /etc/barman.d
+#пользователь, от которого будет запускаться barman
+barman_user = {{ barman_user }}
+#расположение файла с логами
+log_file = /var/log/barman/barman.log
+#Используемый тип сжатия
+compression = gzip
+#Используемый метод бекапа
+backup_method = rsync
+archiver = on
+retention_policy = REDUNDANCY 3
+immediate_checkpoint = true
+#Глубина архива
+last_backup_maximum_age = 4 DAYS
+minimum_redundancy = 1

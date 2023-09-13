@@ -1,0 +1,29 @@
+---
+- name: Ensure exported path exists
+  ansible.builtin.file:
+    path: "{{ [] }}"
+    state: directory
+    mode: '0777'
+  with_items: "{{ nfs_exports }}"
+
+- name: Update NFS exports file
+  ansible.builtin.lineinfile:
+    path: /etc/exports
+    line: "{{ item.path }} {{ item.network }}({{ item.mout_opts }})"
+  with_items: "{{ nfs_exports }}"
+  notify:
+    - re-export filesystem
+    - restart NFS service
+
+- name: Enable enable NFS service
+  ansible.builtin.service:
+    name: nfs-server
+    enabled: true
+
+- name: Start NFS service
+  ansible.builtin.service:
+    name: nfs-server
+    state: started
+
+- name: flush handlers
+  ansible.builtin.meta: flush_handlers

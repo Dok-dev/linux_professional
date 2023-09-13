@@ -1,0 +1,37 @@
+---
+- name: Install LVM packages
+  ansible.builtin.dnf:
+    name:
+      - lvm2
+    state: present
+
+- name: Create a new ext4 primary partitions
+  community.general.parted:
+    device: "{{ item }}"
+    number: 1
+    state: present
+    fs_type: ext4
+  with_items:
+    - /dev/sdb
+    - /dev/sdc
+
+- name: Create a volume group
+  community.general.lvg:
+    vg: bd-vg
+    pvs: /dev/sdc1
+
+- name: Create a logical volume
+  lvol:
+    vg: bd-vg
+    lv: bd-lv
+    size: "100%VG"
+    force: yes
+
+- name: Extend the logical volume to take all remaining space of the PVs and resize the underlying filesystem
+  lvol:
+    vg: bd-vg
+    lv: bd-lv
+    size: +100%FREE
+    resizefs: true
+    force: yes
+

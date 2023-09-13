@@ -1,0 +1,14 @@
+---
+- name: restart haproxy
+  become: true
+  service:
+    name: "{{ haproxy__service_name }}"
+    state: restarted
+
+
+- name: reload haproxy
+  become: true
+  service:
+    name: "{{ haproxy__service_name }}"
+    state: reloaded
+

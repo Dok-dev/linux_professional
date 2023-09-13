@@ -1,0 +1,39 @@
+version: '3.3'
+
+services:
+
+  nginx:
+    image: nginx:1.15.12-alpine
+    container_name: nginx
+    restart: unless-stopped
+    # Т.к. все запросы к приложениям будут проходить через nginx, пробросим под каждое приложение по порту.
+    ports:
+      - 80:80
+    volumes:
+    # будет использоваться php-fpm, необходимо смонтировать статические файлы wordpress :
+      - /var/www/static:/var/www/html/static
+      - ./nginx-conf:/etc/nginx/conf.d # монтируем конфиг
+      - /var/log/nginx:/var/log/nginx
+    networks:
+      - app-network
+    depends_on: # nginx будет запускаться после всех приложений
+      - app
+
+  app:
+    build: ./django # для нашего приложения нужны зависимости, поэтому собираем свой образ 
+    container_name: app
+    restart: always
+    env_file:
+      - .env # импортируем в контейнер переменные из .env
+    command: bash -c "
+      python3 manage.py migrate &&
+      python3 manage.py shell < adminuser.py &&
+      gunicorn --workers=2 --bind=0.0.0.0:8000 mysite.wsgi:application" # команда для запуска django проекта, приложение будет работать на 8000 порту контейнера
+    volumes:
+      - /var/www/static:/src/static
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

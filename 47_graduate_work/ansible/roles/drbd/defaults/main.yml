@@ -1,0 +1,10 @@
+---
+# defaults file for drbd
+drbd_node1_address: '192.168.57.11'
+drbd_node2_address: '192.168.57.12'
+drbd_node1_name: back-node1
+drbd_node2_name: back-node2
+drbd_resource_name: back_fs
+# be caeful allow two primaries in the network between KVM nodes will result in a split-brain
+drbd_allow_two_primaries: 'no'
+drbd_protocol: 'C'

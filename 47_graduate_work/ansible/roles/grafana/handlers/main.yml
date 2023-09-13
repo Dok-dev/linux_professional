@@ -1,0 +1,12 @@
+- name: "Restart the Grafana service."
+  service:
+    name: grafana-server
+    state: restarted
+  listen: event_restart_grafana
+
+- name: "Restart firewalld"
+  systemd:
+    name: firewalld
+    state: restarted
+  listen: event_restart_firewalld
+  

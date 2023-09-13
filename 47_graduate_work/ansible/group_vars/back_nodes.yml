@@ -1,0 +1,4 @@
+---
+nfs_mode:
+  server: true
+  clients: false

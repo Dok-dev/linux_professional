@@ -1,0 +1,14 @@
+---
+# handlers file for pacemaker
+
+- name: restart corosync
+  service:
+    name: "corosync"
+    state: "restarted"
+  become: true
+
+- name: restart pacemaker
+  service:
+    name: "pcsd"
+    state: "restarted"
+  become: true

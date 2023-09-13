@@ -1,0 +1,320 @@
+---
+# haproxy__package_name: string
+# desc: install package name (required)
+haproxy__package_name: haproxy
+
+# haproxy__package_version: string
+# desc: installed package version
+haproxy__package_version: !!null
+
+# haproxy__package_state: string [present|latest]
+# desc: installes package state (required)
+haproxy__package_state: present
+
+# haproxy__user_shell: string or null
+#  desc: haproxy user login shell (required)
+haproxy__user_shell: "{{ haproxy__shell_nologin }}"
+
+# haproxy__config_file: string or null
+#  desc: path to haproxy config file, if null ansible don`t generate this config
+haproxy__config_file: "{{ haproxy__config_path }}/{{ haproxy__config_name }}"
+
+# haproxy__config_extra_file: list or null
+# desc: paths to extra haproxy service configuration files, to override systemd
+haproxy__config_extra_file: []
+
+
+############################ HAPROXY CONFIG ####################################
+
+# haproxy__ssl_default_ciphers: list
+# desc: Default ssl ciphers
+haproxy__ssl_default_ciphers:
+  - ECDHE-ECDSA-AES256-GCM-SHA384
+  - ECDHE-RSA-AES256-GCM-SHA384
+  - ECDHE-ECDSA-CHACHA20-POLY1305
+  - ECDHE-RSA-CHACHA20-POLY1305
+  - ECDHE-ECDSA-AES128-GCM-SHA256
+  - ECDHE-RSA-AES128-GCM-SHA256
+  - ECDHE-ECDSA-AES256-SHA384
+  - ECDHE-RSA-AES256-SHA384
+  - ECDHE-ECDSA-AES128-SHA256
+  - ECDHE-RSA-AES128-SHA256
+
+# haproxy__ssl_default_options: []
+# desc: Default ssl options:
+haproxy__ssl_default_options:
+  - no-sslv3
+  - no-tlsv10
+  - no-tlsv11
+  - no-tls-tickets
+
+# haproxy__stats_timeout: string
+# docs: The default timeout on the stats socket is set to 10 seconds.
+haproxy__stats_timeout: 10s
+
+# haproxy__tune_ssl_default_dh_param: int
+# docs: Sets the maximum size of the Diffie-Hellman parameters used for generating
+#       the ephemeral/temporary Diffie-Hellman key in case of DHE key exchange.
+haproxy__tune_ssl_default_dh_param: 2048
+
+# haproxy__stats_socket: string
+# turn on stats unix socket
+# or: '/run/haproxy/admin.sock mode 660 level admin'
+haproxy__stats_socket: '/var/lib/haproxy/stats'
+
+# haproxy__log: string
+# docs: define logs servers
+# UBUNTU# log /dev/log	local0
+# UBUNTU# log /dev/log	local1 notice
+# log         127.0.0.1 local2
+haproxy__log: '127.0.0.1 local2'
+
+# haproxy__global_maxconn: int
+# docs: Decifies the maximal number of concurrent connections that will be sent to all servers
+haproxy__global_maxconn: 2000
+
+# haproxy__nbproc: int | null
+# This restricts the list of processes and/or threads on which this listener is allowed to run.
+haproxy__nbproc: !!null
+
+# haproxy__default_maxconn: int
+# docs: Define default:  maxconn" parameter specifies the maximal number of concurrent
+#       connections that will be sent to this server.
+haproxy__default_maxconn: 250
+
+# haproxy__default_fullconnL int
+# docs: Specify at what backend load the servers will reach their maxconn
+haproxy__default_fullconn: "{{ (haproxy__default_maxconn / 10) | int }}"
+
+# haproxy__default_mode: string
+# Set the running mode or protocol of the instance { tcp|http|health }
+haproxy__default_mode: http
+
+# haproxy__default_log: string |null
+# docs: Enable per-instance logging of events and traffic.
+# Example: haproxy__default_log: global
+haproxy__default_log: global
+
+# haproxy__default_timeout_connect: string
+# docs: Set the maximum time to wait for a connection attempt to a server to succeed.
+haproxy__default_timeout_connect: 4s
+
+# haproxy__default_timeout_client: string
+# docs: Set the maximum inactivity time on the client side.
+haproxy__default_timeout_client: 30s
+
+# haproxy__default_timeout_server: string
+# docs: Set the maximum inactivity time on the server side.
+haproxy__default_timeout_server: 30s
+
+# haproxy__default_timeout_queue: string
+# docs: Set the maximum time to wait in the queue for a connection slot to be free
+haproxy__default_timeout_queue: 60s
+
+# haproxy__default_timeout_http_request (timeout http-request)
+# timeout for the client to send a whole request
+# (protection against slowlowris-like attacks)
+haproxy__default_timeout_http_request: 10s
+
+# haproxy__default_timeout_client_fin: string
+# docs: Set the inactivity timeout on the client side for half-closed connections.
+haproxy__default_timeout_client_fin: 1s
+
+# haproxy__default_timeout_server_fin: string
+# docs: Set the inactivity timeout on the server side for half-closed connections.
+haproxy__default_timeout_server_fin: 1s
+
+# haproxy__default_timeout_http_keep_alive: string
+# Set the maximum allowed time to wait for a new HTTP request to appear
+haproxy__default_timeout_http_keep_alive: 10s
+
+# haproxy__default_timeout_tunnel: string | null
+# Set the maximum inactivity time on the client and server side for tunnels.
+# Example: haproxy__default_timeout_tunnel: 2m
+haproxy__default_timeout_tunnel: !!null
+
+# haproxy__default_default_server: string | null
+# docs: defaulkt options added to servers definintions
+haproxy__default_default_server: !!null
+
+# haproxy__default_error_file: dict
+# list of defaults error files
+# example:
+#   haproxy__default_error_file:
+#    400: /etc/haproxy/errors/400.http
+#    403: /etc/haproxy/errors/403.http
+#    504: /etc/haproxy/errors/504.http
+haproxy__default_error_file: {}
+
+# haproxy__default_options: list
+# docs: list of options in default desctions
+# Example:
+#   haproxy__default_options:
+#    - httplog
+#    - dontlognull
+#   - http-server-close
+haproxy__default_options:
+  - http-server-close
+
+# haproxy__default_crt_base: string | null
+# docs: default path to certyficates
+haproxy__default_crt_base: !!null
+
+# haproxy__default_retries:
+#  docs: Set the number of retries to perform on a server after a connection failure
+# haproxy__default_retries int
+haproxy__default_retries: !!null
+
+# haproxy__mailers: {}
+# List of defined mailers
+#
+# Example:
+#  haproxy__mailers:
+#   mymailers:
+#     smtp1: 127.0.0.1:25
+#     smtp2: 192.168.0.1:25
+haproxy__mailers: {}
+
+# haproxy__listen:
+#   http-in:
+#     bind: [':666']
+#     mode: tcp
+haproxy__listen: {}
+
+# haproxy__frontend: dict
+# docs: List of frontends
+# Example:
+# haproxy__frontend: {}
+#   http-in:
+#     bind: [':80']
+#     mode: tcp
+#     'http-request':
+#       - deny if { path -i -m beg /api } !{ src 10.0.0.0/16 }
+#     reqadd:
+#     - 'X-Forwarded-Proto:\ https if { ssl_fc }'
+#     - 'HTTPS:\ on if { ssl_fc }'
+#
+#   stats:
+#     bind: [127.0.0.1:71]
+#     option: [httplog]
+#     reqadd: ['X-Forwarded-Proto:\ https if { ssl_fc }']
+#     #acl: [ssss]
+#
+#   http-private:
+#     mode: http
+#     bind:
+#     - 127.0.0.1:89
+#     - 127.0.0.1:8080
+#     option:
+#      - httplog
+#      - dontlognull
+#     capture:
+#       - request header Host len 25
+#     errorfile:
+#        503: /usr/share/haproxy/503.http
+haproxy__frontend: {}
+
+# haproxy__backends: dict
+# docs: List of backends
+#
+# Example:
+#  haproxy__backends:
+#    backens_http:
+#    backens_foo:
+#      mode: http
+#      timeout:
+#        http-request: 30s
+#       reqrep:
+#        - '^([^\ ]*\ /)executor[/]?(.*)  \1\2'
+#       reqirep:
+#        - '^([^\ ]*\ /)executor[/]?(.*)  \1\2'
+#        http-response:
+#          - replace-value Location (http|https)://([^/]*)\/(.*)$ \1://\2/executor/\3
+#      option:
+#        - 'httpchk HEAD / HTTP/1.0'
+#        - 'forwardfor'
+#    backens_bar:
+#      redirect:
+#        - scheme https code 301 if !{ ssl_fc }
+#      server-template: srv 3 google.com:80 check
+#      servers:
+#      - name: vm-240
+#        address: 192.168.0.100:80
+#        param:
+#          weight: 10
+#          check:
+#          minconn: 10
+#          maxconn: 150
+#      - name: vm-241
+#        address: 192.168.0.101:80
+#        param:
+#          weight: 10
+#          check:
+#            minconn: 10
+#            maxconn: 150
+#      - name: vm-245
+#        address: 192.168.0.100:80
+#     templates:
+#     - name: rabbitmq
+#       range: 1-20
+#       fqdn: rabbitmq.local
+#       port: 15672
+#     param:
+#       resolvers: haproxy_dns
+#       check:
+#       inter:  5s
+#       rise: 2
+#       fall: 3
+haproxy__backends: {}
+
+# haproxy__map_files: dict
+#  docs: List of map files
+#  Example:
+#    haproxy__map_files:
+#     'backends.web-in.map':
+#        - #item: values
+#        - my.test www_example
+haproxy__map_files: {}
+
+# haproxy__ssl_files: dict
+#  docs: list of certyficate to upload
+#  format:
+#    {{ cert name }} : {{ cert content }}# example:
+#  Example:
+#    haproxy__ssl_files:
+#      'star.example:com.crt': "{{ lookup('file', 'files/certs/star.example:com.crt.haproxy.crt.vault') }}"
+haproxy__ssl_files: {}
+
+# haproxy__resolvers: dict
+#  desc: resolvers definintions
+#
+#  example:
+#    haproxy__resolvers:
+#      resolver_name:
+#        nameserver:
+#          dns1: 10.0.0.2:53
+#          dns2: 10.0.0.2:53
+#        resolve_retries: 3
+#        timeout resolve: 1s
+#        timeout retry: 1s
+#        hold other: 30s
+#        hold refused: 30s
+#        hold nx: 30s
+#        hold timeout: 30s
+#        hold valid: 10s
+#        hold obsolete: 30s
+#      resolver_name2 ....
+haproxy__resolvers: {}
+
+#  generate password mkpasswd -m sha-512 password2
+
+# example:
+# haproxy__userlist:
+#    developers:
+#      user:
+#        - name: user1
+#          insecure-password: some-password
+#        - name: user2
+#          password: $1$R29iAdV/$1QUKx8eo6e5pcMIEgaZwt0
+
+haproxy__userlist: {}

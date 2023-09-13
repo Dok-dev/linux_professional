@@ -1,0 +1,37 @@
+---
+# haproxy__config_path: string
+#  desc: config path
+haproxy__config_path: /etc/haproxy
+
+# haproxy__config_name: string
+#  desc: config file name
+haproxy__config_name: haproxy.cfg
+
+# haproxy__service_name: string
+#  desc: service name
+haproxy__service_name: haproxy
+
+
+# haproxy__user: string
+#  desc: system user
+haproxy__user: haproxy
+
+
+# haproxy__group: string
+#  desc: system group
+haproxy__group: haproxy
+
+
+# haproxy__chroot: string
+#  desc: path to chroot enviroment
+haproxy__chroot: /var/lib/haproxy
+
+
+# haproxy__override_service_file_path: string
+#  desc: path to the file to override haproxy unit
+haproxy__override_service_file_path: /etc/systemd/system/haproxy.service.d/override.conf
+
+
+# haproxy__service_command_config: string
+#  desc: command to start haproxy with, used in unit template(templates)
+haproxy__service_command_config: /usr/sbin/haproxy -f $CONFIG

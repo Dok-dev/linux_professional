@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  role_name: pacemaker
+  author: me 
+  description: Configure Pacemaker cluster
+  company: my
+  license: BSD
+  min_ansible_version: 2.7
+  platforms:
+    - name: EL
+      versions:
+        - 8
+  galaxy_tags:
+    - clustering
+    - cluster
+    - pacemaker
+    - corosync
+    - ha
+    - highavailability
+    - heartbeat
+    - pcs
+dependencies: []

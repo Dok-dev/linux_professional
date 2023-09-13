@@ -1,0 +1,13 @@
+galaxy_info:
+  author: me
+  description: HA Proxy role
+  company: none
+
+  license: BSD
+
+  min_ansible_version: 2.1
+
+  galaxy_tags: []
+
+dependencies: []
+

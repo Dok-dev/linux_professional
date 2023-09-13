@@ -1,0 +1,9 @@
+{% if (haproxy__config_extra_file is defined) and haproxy__config_extra_file %}
+[Service]
+ExecStartPre=
+ExecStartPre={{ haproxy__service_command_config }} -f {{ haproxy__config_extra_file | join(' -f ')}} -c -q
+ExecStart=
+ExecStart={{ haproxy__service_command_config }} -Ws -f {{ haproxy__config_extra_file | join(' -f ')}} -p $PIDFILE
+ExecReload=
+ExecReload={{ haproxy__service_command_config }} -f {{ haproxy__config_extra_file | join(' -f ')}} -c -q
+{% endif %}

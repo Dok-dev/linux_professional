@@ -1,0 +1,4 @@
+---
+# haproxy__shell_nologin: string
+#  desc: path to nologin shell
+haproxy__shell_nologin: /usr/sbin/nologin

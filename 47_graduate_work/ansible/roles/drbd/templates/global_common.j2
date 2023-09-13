@@ -1,0 +1,9 @@
+global {
+ usage-count  yes;
+}
+common {
+ net {
+    protocol {{ drbd_protocol }};
+    allow-two-primaries {{ drbd_allow_two_primaries }};
+ }
+}

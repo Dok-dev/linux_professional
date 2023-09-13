@@ -1,0 +1,40 @@
+routers:
+  hosts:
+    inetRouter:
+        ansible_host: 192.168.59.2
+        ansible_private_key_file: .vagrant/machines/inetRouter/virtualbox/private_key
+    router-lb:
+        ansible_host: 192.168.60.3
+        ansible_private_key_file: .vagrant/machines/LoadBalancer/virtualbox/private_key
+
+front_nodes:
+  hosts:
+    front-node1:
+        ansible_host: 192.168.60.11
+        ansible_private_key_file: .vagrant/machines/frontNode1/virtualbox/private_key
+    front-node2:
+        ansible_host: 192.168.60.12
+        ansible_private_key_file: .vagrant/machines/frontNode2/virtualbox/private_key
+
+back_nodes:
+  hosts:
+    back-node1:
+        ansible_host: 192.168.60.21
+        ansible_private_key_file: .vagrant/machines/backNode1/virtualbox/private_key
+        master_node: true
+    back-node2:
+        ansible_host: 192.168.60.22
+        ansible_private_key_file: .vagrant/machines/backNode2/virtualbox/private_key
+        master_node: false
+
+back_services:
+  hosts:
+    monitoring:
+        ansible_host: 192.168.60.31
+        ansible_private_key_file: .vagrant/machines/Monitoring/virtualbox/private_key
+    rsyslog:
+        ansible_host: 192.168.60.32
+        ansible_private_key_file: .vagrant/machines/rsyslog/virtualbox/private_key
+    backup:
+        ansible_host: 192.168.60.33
+        ansible_private_key_file: .vagrant/machines/Backup/virtualbox/private_key

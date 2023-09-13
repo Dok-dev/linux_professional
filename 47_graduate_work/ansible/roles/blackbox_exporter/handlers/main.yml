@@ -1,0 +1,5 @@
+- name: "Restart firewalld"
+  systemd:
+    name: firewalld
+    state: restarted
+  listen: event_restart_firewalld

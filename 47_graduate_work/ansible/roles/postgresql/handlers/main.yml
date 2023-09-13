@@ -1,0 +1,6 @@
+---
+# handlers file for astra-postgresql
+- name: restart postgresql
+  ansible.builtin.systemd:
+    name: "{{ postgresql_daemon }}.service"
+    state: reloaded

@@ -1,0 +1,3 @@
+---
+borgbackup_passphrase: "12345FGx8"
+borg_backup_directory: /var/backup

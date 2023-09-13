@@ -1,0 +1,108 @@
+---
+
+- name: Set up forward packages across routers
+  ansible.builtin.sysctl:
+    name: net.ipv4.conf.all.forwarding
+    value: '1'
+    state: present
+  when: "'routers' in group_names"
+
+- name: Set up NAT on inetRouter
+  block: 
+
+    - name: Install iptables
+      ansible.builtin.yum:
+        name:
+        - iptables
+        - iptables-services
+        state: present
+        update_cache: true
+    
+    - name: Copy iptables config
+      ansible.builtin.template:
+        src: templates/inetRouter_iptables.j2
+        dest: /etc/sysconfig/iptables
+        owner: root
+        group: root
+        mode: 0600
+
+    - name: Restart end anable iptables
+      ansible.builtin.service:
+        name: iptables
+        enabled: true
+        state: restarted
+
+    - name: Add default gateway for inetRouter
+      ansible.builtin.copy:
+        dest: /etc/sysconfig/network-scripts/route-eth1
+        content: "{{ routes_eth1 }}"
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Restart networks on inetRouter
+      ansible.builtin.service:
+        name: network
+        state: restarted
+
+    - name: Restart networks on inetRouter
+      ansible.builtin.shell:
+        cmd: systemctl restart network
+
+  when: ansible_hostname == "inetRouter"
+
+
+- name: Set router for CentOS nodes
+  block:
+
+    - name: Disabe default route
+      ansible.builtin.lineinfile:
+        dest: /etc/sysconfig/network-scripts/ifcfg-eth0
+        line: DEFROUTE=no
+      when: ansible_hostname != "inetRouter"
+
+    - name: Add default gateway
+      ansible.builtin.lineinfile:
+        dest: /etc/sysconfig/network-scripts/ifcfg-eth1
+        line: "GATEWAY={{ hostvars[ 'inetRouter' ].ansible_eth1.ipv4.address }}"
+      when: ansible_hostname == "router-lb"
+
+    - name: Add default gateway
+      ansible.builtin.lineinfile:
+        dest: /etc/sysconfig/network-scripts/ifcfg-eth1
+        line: "GATEWAY={{ hostvars[ 'router-lb' ].ansible_eth3.ipv4.address }}"
+      when: (ansible_hostname != "inetRouter") and (ansible_hostname != "router-lb")
+
+    - name: Restart networks
+      ansible.builtin.service:
+        name: "{{ 'network' if ansible_facts.distribution_major_version == '7' else 'NetworkManager' }}"
+        state: restarted
+
+    - name: Restart networks on inetRouter
+      ansible.builtin.shell:
+        cmd: systemctl restart "{{ 'network' if ansible_facts.distribution_major_version == '7' else 'NetworkManager' }}"
+
+    - name: Replace routes temporarily on CentOS 8
+      ansible.builtin.shell: |
+        ip route del default | 2> /dev/null
+        ip r add default via {{ hostvars[ 'router-lb' ].ansible_eth3.ipv4.address }} | 2> /dev/null
+      when:  (ansible_hostname != "inetRouter") and (ansible_hostname != "router-lb")
+
+  when: ansible_facts.distribution == 'CentOS'
+
+
+- name: Set front nodes routes
+  block:
+
+    - name: Set routes for front_nodes
+      ansible.builtin.template:
+        src: templates/netplan.j2
+        dest: /etc/netplan/50-vagrant.yaml
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Apply netplan for front_nodes
+      command: sudo netplan apply
+
+  when: "'front_nodes' in group_names"

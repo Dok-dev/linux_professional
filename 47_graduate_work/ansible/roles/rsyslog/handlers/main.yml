@@ -1,0 +1,15 @@
+---
+- name: restart rsyslog
+  systemd:
+    name: rsyslog
+    state: restarted
+
+- name: reload auditd
+  systemd:
+    name: auditd
+    state: reloaded
+
+- name: restart auditd
+  shell: service auditd restart
+  args:
+    executable: /bin/bash

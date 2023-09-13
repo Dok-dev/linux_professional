@@ -1,0 +1,57 @@
+---
+- ansible.builtin.include_tasks: common.yml
+
+- name: Define postgresql_unix_socket_directories_mode.
+  ansible.builtin.set_fact:
+    postgresql_unix_socket_directories_mode: >-
+      {{ __postgresql_unix_socket_directories_mode | default('02775') }}
+  when: postgresql_unix_socket_directories_mode is not defined
+
+# - name: Get public key for pgdg-redhat-repo-latest
+#   ansible.builtin.rpm_key:
+#     state: present
+#     key: "{{ item }}"
+#   with_items:
+#     - https://rpms.remirepo.net/RPM-GPG-KEY-remi2018
+#     - https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8
+
+- name: Install Postgre repo
+  ansible.builtin.dnf:
+    name: 'https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm'
+    state: present
+    disable_gpg_check: true
+
+#  Отключение старого postgres-модуля
+- name: Disable old postgresql module
+  ansible.builtin.shell: dnf -qy module disable postgresql
+
+- name: Install epel-release
+  dnf:
+    name:
+      - epel-release
+    state: present
+    update_cache: true
+
+- name: Ensure PostgreSQL Python libraries are installed.
+  ansible.builtin.dnf:
+    name: "{{ postgresql_python_library }}"
+    state: present
+    update_cache: true
+
+- name: Ensure PostgreSQL packages are installed.
+  ansible.builtin.dnf:
+    name: "{{ postgresql_packages }}"
+    state: present
+
+- ansible.builtin.include_tasks: initialize.yml
+- ansible.builtin.include_tasks: configure.yml
+
+- name: Ensure PostgreSQL is started and enabled on boot.
+  ansible.builtin.service:
+    name: "{{ postgresql_daemon }}"
+    state: started
+    enabled: true
+
+# Configure PostgreSQL.
+- ansible.builtin.import_tasks: users.yml
+- ansible.builtin.import_tasks: databases.yml

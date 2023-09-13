@@ -1,0 +1,19 @@
+[Unit]
+Description={{serviceName}}
+Documentation=https://github.com/prometheus/blackbox_exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User={{ userId }}
+Group={{ groupId }}
+RestartSec=5
+Restart=on-failure
+AmbientCapabilities=CAP_NET_RAW
+ExecStart={{ exec_command }} \
+    --config.file=/etc/blackbox/blackbox.yml \
+    --web.listen-address=127.0.0.1:9115
+
+[Install]
+WantedBy=multi-user.target

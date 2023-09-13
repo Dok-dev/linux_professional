@@ -1,0 +1,64 @@
+---
+
+- name: Prepare SentOS
+  block:
+  # Отключаем firewalld и удаляем его из автозагрузки
+  # или:
+  # firewall-cmd --permanent --add-service=high-availability
+  # firewall-cmd --permanent --add-service=nfs
+  # firewall-cmd --permanent --add-service=mountd
+  # firewall-cmd --permanent --add-service=rpc-bind
+  # firewall-cmd --reload
+  - name: Disable firewalld service
+    ansible.builtin.service:
+      name: firewalld
+      state: stopped
+      enabled: false
+    when: ansible_facts.distribution == 'CentOS'
+
+  # Отключаем SElinux
+  - name: Disable SELinux
+    selinux:
+      state: disabled
+    when: ansible_facts.distribution == 'CentOS'
+
+  - name: Ensure SELinux is set to disable mode
+    ansible.builtin.lineinfile:
+      path: /etc/selinux/config
+      regexp: '^SELINUX='
+      line: SELINUX=disabled
+    when: ansible_facts.distribution == 'CentOS'
+
+  #  Установка EPEL-release
+  - name: Install epel-release
+    ansible.builtin.dnf:
+      name:
+        - epel-release
+      state: present
+      update_cache: true
+
+  - name: Install NSF packages
+    ansible.builtin.dnf:
+      name:
+        - nfs-utils
+      state: present
+      update_cache: true
+
+  when: ansible_facts.distribution == 'CentOS'
+
+- name: Install NSF packages
+  ansible.builtin.apt:
+    name:
+      - nfs-kernel-server
+      - nfs-common
+    state: present
+    update_cache: true
+  when: ansible_facts.distribution == 'Ubuntu'
+
+- name: NFS-server setup
+  include_tasks: nfs-server.yml
+  when: nfs_mode.server
+
+- name: NFS-clients setup
+  include_tasks: nfs-clients.yml
+  when: nfs_mode.clients

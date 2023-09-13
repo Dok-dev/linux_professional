@@ -1,0 +1,71 @@
+{% macro option(name, vars) %}
+  {%- if vars is defined -%}
+      {{- name }} {{ vars }}
+  {%- endif -%}
+{% endmacro %}
+
+
+{% macro options(name, vars) %}
+{%- if vars is defined -%}
+  {%- for __option in vars -%}
+    {{- name  }} {{ __option }}
+  {% endfor -%}
+{%- endif -%}
+{% endmacro %}
+
+
+{% macro acl(vars) %}
+{%- if vars is defined and vars -%}
+  {%- if vars is mapping -%}
+    {%- for acl_name, __option in vars.items() -%}
+acl {{ acl_name  }} {{ __option }}
+    {% endfor -%}
+  {%- else -%}
+    {%- for __definition in vars -%}
+acl {{ __definition }}
+    {% endfor -%}
+  {%- endif -%}
+{%- endif -%}
+{% endmacro %}
+
+
+
+{% macro servers(server) -%}
+server {{ server.name }} {{ server.address }}{{ ':' + server.port|string if ((server.port is defined) and (server.port)) else '' }}
+{%- if  server.param is defined %}
+    {%- if server.param.weight is defined %} weight {{ server.param.weight | int }}{% endif %}
+    {%- if server.param.minconn is defined %} minconn {{ server.param.minconn | int }}{% endif %}
+    {%- if server.param.maxconn is defined %} maxconn {{ server.param.maxconn | int }}{% endif %}
+    {%- if server.param.resolvers is defined %} resolvers {{ server.param.resolvers }}{% endif %}
+    {%- if server.param.check is defined %} check
+        {%- if server.param.check.inter is defined %} inter {{ server.param.check.inter }}{% endif %}
+        {%- if server.param.check.rise is defined %} rise {{ server.param.check.rise | int }}{% endif %}
+        {%- if server.param.check.fall is defined %} fall {{ server.param.check.fall | int }}{% endif %}
+        {%- if server.param.check.port is defined %} port {{ server.param.check.port | int }}{% endif %}
+    {%- endif %}
+    {%- if server.param.ssl is defined %} ssl
+        {%- if server.param.ssl is not none %} {{ server.param.ssl }}{% endif %}
+    {%- endif %}
+    {%- if server.param.backup is defined and server.param.backup %} backup {% endif %}
+{% endif %}
+{% endmacro %}
+
+
+{% macro server_templates(server) -%}
+server-template {{ server.name }} {{ server.range }} {{ server.fqdn }}{{ ':' + server.port|string if ((server.port is defined) and (server.port)) else '' }}
+{%- if  server.param is defined %}
+    {%- if server.param.weight is defined %} weight {{ server.param.weight | int }}{% endif %}
+    {%- if server.param.minconn is defined %} minconn {{ server.param.minconn | int }}{% endif %}
+    {%- if server.param.maxconn is defined %} maxconn {{ server.param.maxconn | int }}{% endif %}
+    {%- if server.param.resolvers is defined %} resolvers {{ server.param.resolvers }}{% endif %}
+    {%- if server.param.check is defined %} check
+        {%- if server.param.check.inter is defined %} inter {{ server.param.check.inter }}{% endif %}
+        {%- if server.param.check.rise is defined %} rise {{ server.param.check.rise | int }}{% endif %}
+        {%- if server.param.check.fall is defined %} fall {{ server.param.check.fall | int }}{% endif %}
+        {%- if server.param.check.port is defined %} port {{ server.param.check.port | int }}{% endif %}
+    {%- endif %}
+    {%- if server.param.ssl is defined %} ssl
+        {%- if server.param.ssl is not none %} {{ server.param.ssl }}{% endif %}
+    {%- endif %}
+{% endif %}
+{% endmacro %}

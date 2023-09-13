@@ -1,0 +1,249 @@
+---
+# # Отключаем firewalld и удаляем его из автозагрузки
+# - name: Disable firewalld service
+#   ansible.builtin.service:
+#     name: firewalld
+#     state: stopped
+#     enabled: false
+
+# # Отключаем SElinux
+# - name: Disable SELinux
+#   selinux:
+#     state: disabled
+
+# - name: Ensure SELinux is set to disable mode
+#   ansible.builtin.lineinfile:
+#     path: /etc/selinux/config
+#     regexp: '^SELINUX='
+#     line: SELINUX=disabled
+
+# #  Установка EPEL-release
+# - name: Install epel-release
+#   ansible.builtin.dnf:
+#     name:
+#       - epel-release
+#     state: present
+#     update_cache: true
+
+- name: haproxy | include os specific variables
+  include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_distribution | lower }}.yml"
+  tags:
+    - always
+    - haproxy
+
+- name: haproxy | create system group
+  become: true
+  group:
+    name: "{{ haproxy__group }}"
+    state: present
+  tags:
+    - haproxy
+    - haproxy::install
+
+- name: haproxy | create system user
+  become: true
+  user:
+    name: "{{ haproxy__user }}"
+    group: "{{ haproxy__group }}"
+    shell: "{{ haproxy__user_shell }}"
+    system: true
+    createhome: true
+  tags:
+    - haproxy
+    - haproxy::install
+
+- name: haproxy | install haproxy packages
+  become: true
+  vars:
+    ver_pref:
+      apt: '='
+      yum: '-'
+    haproxy___version: "{{ (ver_pref[ansible_pkg_mgr] + haproxy__package_version) if haproxy__package_version else '' }}"
+  package:
+    name: "{{ haproxy__package_name }}{{ haproxy___version }}"
+    state: "{{ haproxy__package_state }}"
+  tags:
+    - haproxy
+    - haproxy::install
+
+- name: haproxy | set permissions for the config directory
+  become: true
+  file:
+    path: "{{ haproxy__config_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+    seuser: system_u
+    serole: object_r
+    setype: etc_t
+  tags:
+    - haproxy
+    - haproxy::install
+    - haproxy::configure
+
+- name: haproxy | create haproxy extra configs dirs
+  become: true
+  file:
+    path: "{{ haproxy__config_path }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0751
+    seuser: system_u
+    serole: object_r
+    setype: etc_t
+  with_items:
+    - 'maps'
+    - 'ssl'
+    - 'ssl-auto'
+    - 'conf.d'
+  tags:
+    - haproxy
+    - haproxy::install
+    - haproxy::configure
+
+- name: haproxy | install tls certificates
+  become: true
+  copy:
+    content: "{{ item.value }}"
+    dest: "{{ haproxy__config_path }}/ssl/{{ item.key }}"
+    owner: root
+    group: root
+    mode: 0640
+    seuser: system_u
+    serole: object_r
+    setype: etc_t
+  with_dict: "{{ haproxy__ssl_files }}"
+  notify: 'restart haproxy'
+  no_log: true
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - haproxy
+    - haproxy::configure
+
+- name: haproxy | configure maps files
+  become: true
+  template:
+    src: maps/maps.j2
+    dest: "{{ haproxy__config_path }}/maps/{{ item }}"
+    owner: root
+    group: root
+    mode: 0640
+    seuser: system_u
+    serole: object_r
+    setype: etc_t
+  with_items: "{{ haproxy__map_files }}"
+  notify: 'restart haproxy'
+  tags:
+    - haproxy
+    - haproxy::configure
+
+- name: haproxy | create config file
+  become: true
+  template:
+    src: haproxy.cfg.j2
+    dest: "{{ haproxy__config_file }}"
+    owner: root
+    group: root
+    mode: 0640
+    seuser: system_u
+    serole: object_r
+    setype: etc_t
+    validate: 'haproxy -c -f %s'
+  notify: 'restart haproxy'
+  when: (haproxy__config_file is defined ) and (haproxy__config_file)
+  tags:
+    - haproxy
+    - haproxy::configure
+
+- name: haproxy | check if haproxy__config_extra_file already exists
+  stat:
+    path: "{{ item }}"
+  register: haproxy___extraf_stats
+  when: (haproxy__config_extra_file is defined ) and (haproxy__config_extra_file)
+  loop: "{{ haproxy__config_extra_file }}"
+  tags:
+    - haproxy
+
+- name: haproxy | create extra configuration files for haproxy.service if they does not already exist
+  file:
+    path: "{{ item.item }}"
+    state: touch
+    owner: root
+    group: root
+    mode: 0640
+    seuser: system_u
+    serole: object_r
+    setype: etc_t
+  loop: "{{ haproxy___extraf_stats.results }}"
+  when:
+    - haproxy___extraf_stats is defined and haproxy___extraf_stats.results
+    - not item.stat.exists
+  tags:
+    - haproxy
+    - haproxy::configure
+
+- name: haproxy | create directory /etc/systemd/system/haproxy.service.d if does not already exists
+  become: true
+  file:
+    path: /etc/systemd/system/haproxy.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+    seuser: system_u
+    serole: object_r
+    setype: etc_t
+  when: (haproxy__config_extra_file is defined ) and (haproxy__config_extra_file)
+  tags:
+    - haproxy
+    - haproxy::service
+
+- name: haproxy | add extra config to haproxy.service unit
+  become: true
+  template:
+    src: config_extra_files.j2
+    dest: "{{ haproxy__override_service_file_path }}"
+    owner: root
+    group: root
+    mode: 0640
+    seuser: system_u
+    serole: object_r
+    setype: etc_t
+  register: haproxy_service
+  when: (haproxy__config_extra_file is defined ) and (haproxy__config_extra_file)
+  tags:
+    - haproxy
+    - haproxy::service
+
+- name: reload systemd
+  systemd:
+    daemon_reload: true
+  when: haproxy_service.changed
+  tags:
+    - haproxy
+    - haproxy::systemd
+    - skip_ansible_lint
+
+- name: haproxy | ensure that service is running
+  become: true
+  service:
+    name: "{{ haproxy__service_name }}"
+    state: started
+  when: (haproxy__config_file is defined ) and (haproxy__config_file)
+  tags:
+    - haproxy
+    - haproxy::running
+
+- name: haproxy | ensure that haproxy service is enabled
+  become: true
+  service:
+    name: "{{ haproxy__service_name }}"
+    enabled: true
+  tags:
+    - haproxy
+    - haproxy::enabled

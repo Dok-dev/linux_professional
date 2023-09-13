@@ -1,0 +1,70 @@
+---
+
+- ansible.builtin.include_tasks: tasks/common.yml
+
+- name: Install epel-release on CentOS
+  ansible.builtin.dnf:
+    name:
+      - epel-release
+    state: present
+    update_cache: true
+
+- name: Enable powertools repo # Bug https://bugzilla.redhat.com/show_bug.cgi?id=1995252
+  ansible.builtin.command:
+    dnf config-manager --set-enabled powertools
+
+- name: Install packages
+  ansible.builtin.dnf:
+    name:
+      - borgbackup
+    state: present
+    update_cache: true
+
+- name: Create borg user
+  ansible.builtin.user:
+    name: borg
+    shell: /bin/bash
+    force: no
+
+- name: Set directory permissions for borg backup
+  ansible.builtin.file:
+    path: "{{ borg_backup_directory }}"
+    state: directory
+    recurse: true
+    owner: borg
+    group: borg
+    mode: '0640'
+
+- name: Check if d folder is empty before proceeding
+  ansible.builtin.find:
+    paths: "{{ borg_backup_directory }}"
+  register: filesFound
+
+- name: Create borg repo
+  ansible.builtin.shell:
+    "borg init --encryption=repokey {{ borg_backup_directory }}/"
+  environment:
+      BORG_PASSPHRASE: "{{ borgbackup_passphrase }}"
+  when: filesFound.matched == 0
+  register: backup_init
+  changed_when: "'Write down the passphrase' in backup_init.stderr"
+
+- name: Create systemd unit
+  ansible.builtin.template:
+    src: templates/borg-backup.service.j2
+    dest: /etc/systemd/system/borg-backup.service
+    owner: root
+    group: root
+    mode: 0644
+  become: true
+  notify: restart borg-backup service
+
+- name: Create systemd timer
+  ansible.builtin.template:
+    src: templates/borg-backup.timer
+    dest: /etc/systemd/system/borg-backup.timer
+    owner: root
+    group: root
+    mode: 0644
+  become: true
+  notify: restart borg-backup timer

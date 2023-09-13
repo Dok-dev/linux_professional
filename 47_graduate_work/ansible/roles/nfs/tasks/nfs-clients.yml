@@ -1,0 +1,14 @@
+---
+
+- name: check if mount directory exists
+  file:
+    path: "{{ nfs_client_mnt_point }}"
+    state: directory
+
+- name: mount the filesystem
+  mount:
+    path: "{{ nfs_client_mnt_point }}"
+    src: "{{ nfs_server }}:{{ nfs_export.path }}"
+    opts: "{{ nfs_export.mout_opts }}"
+    fstype: nfs
+    state: mounted

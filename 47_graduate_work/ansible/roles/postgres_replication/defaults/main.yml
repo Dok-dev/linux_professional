@@ -1,0 +1,7 @@
+---
+# defaults file for postgres_replication
+replicator_password: 'Otus2022!'
+master_ip: '192.168.57.11'
+slave_ip: '192.168.57.12'
+master_node: "{{ true if ansible_host == master_ip else false }}"
+pg_listen_addresses: 'localhost, {{ ansible_hoost }}'

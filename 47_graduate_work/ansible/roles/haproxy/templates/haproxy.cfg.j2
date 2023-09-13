@@ -1,0 +1,391 @@
+#jinja2: lstrip_blocks:True, trim_blocks: True
+{% import 'macros.j2' as haproxy %}
+{{ ansible_managed|comment }}
+
+global
+  chroot {{ haproxy__chroot }}
+  user   {{ haproxy__user }}
+  group  {{ haproxy__group }}
+  daemon
+  {% if haproxy__nbproc %}
+
+  nbproc {{ haproxy__nbproc }}
+  {% endif %}
+  maxconn {{ haproxy__global_maxconn }}
+  {% if haproxy__log %}
+
+  log {{ haproxy__log }}
+
+  {% endif %}
+  stats socket  {{ haproxy__stats_socket }}
+  stats timeout {{ haproxy__stats_timeout }}
+  {% if (haproxy__default_crt_base is defined) and haproxy__default_crt_base %}
+
+  crt-base {{ haproxy__default_crt_base }}
+
+  {% endif %}
+  {# Default ciphers to use on SSL-enabled listening sockets. #}
+  ssl-default-bind-ciphers   {{ haproxy__ssl_default_ciphers|join(':') }}
+  ssl-default-server-ciphers {{ haproxy__ssl_default_ciphers|join(':') }}
+  ssl-default-bind-options   {{ haproxy__ssl_default_options|join(' ') }}
+  ssl-default-server-options {{ haproxy__ssl_default_options|join(' ') }}
+
+  tune.ssl.default-dh-param {{ haproxy__tune_ssl_default_dh_param }}
+
+
+
+defaults
+  {% if haproxy__default_mode %}
+  mode {{ haproxy__default_mode }}
+  {% endif %}
+  {% if haproxy__default_log %}
+  log  {{ haproxy__default_log }}
+  {% endif %}
+  {% if haproxy__default_options %}
+
+  {% for _option in haproxy__default_options %}
+  option {{ _option }}
+  {% endfor %}
+  {% endif %}
+
+  timeout client {{ haproxy__default_timeout_client }}
+  timeout server {{ haproxy__default_timeout_server }}
+  timeout connect {{ haproxy__default_timeout_connect }}
+  timeout queue  {{ haproxy__default_timeout_queue }}
+
+  timeout client-fin {{ haproxy__default_timeout_client_fin }}
+  timeout server-fin {{ haproxy__default_timeout_server_fin }}
+
+  timeout http-request {{ haproxy__default_timeout_http_request }}
+  {% if haproxy__default_timeout_http_keep_alive %}
+  timeout http-keep-alive {{ haproxy__default_timeout_http_keep_alive }}
+  {% endif -%}
+  {% if haproxy__default_timeout_tunnel %}
+
+  timeout tunnel {{ haproxy__default_timeout_tunnel }}
+  {% endif %}
+
+  {% if haproxy__default_default_server %}
+  default-server {{ haproxy__default_default_server }}
+  {% endif %}
+
+  maxconn {{ haproxy__default_maxconn }}
+  {% if haproxy__default_fullconn is defined and haproxy__default_fullconn %}
+  fullconn {{ haproxy__default_fullconn }}
+  {% endif %}
+
+  {% if haproxy__default_error_file %}
+
+  {% for _errorcode, _errorfile in haproxy__default_error_file.items() %}
+  errorfile {{ _errorcode }} {{ _errorfile }}
+  {% endfor %}
+  {% endif %}
+  {% if haproxy__default_retries %}
+  retries {{ haproxy__default_retries|int }}
+  {% endif %}
+
+{# RESOLVERS -----------------------------------------------------------------#}
+{% if ( haproxy__resolvers is defined ) and (haproxy__resolvers) %}
+
+
+
+{% for resolver_key, resolver_data in haproxy__resolvers.items() %}
+
+resolvers {{resolver_key}}
+  {% if (resolver_data['nameserver'] is defined) and (resolver_data['nameserver']) %}
+  {% for _nameserver in resolver_data['nameserver'] %}
+  nameserver {{ _nameserver }} {{ resolver_data['nameserver'][_nameserver] }}
+  {% endfor %}
+  {% endif %}
+  {% if (resolver_data['parse-resolv-conf'] is defined) and (resolver_data['parse-resolv-conf']|bool) %}
+  parse-resolv-conf
+  {% endif %}
+  {{ haproxy.option('resolve_retries', resolver_data['resolve_retries']) | indent(3) }}
+  {{ haproxy.option('timeout resolve', resolver_data['timeout_resolve']) | indent(3) }}
+  {{ haproxy.option('timeout retry', resolver_data['timeout_retry']) | indent(3) }}
+  {{ haproxy.option('hold other', resolver_data['hold_other']) | indent(3) }}
+  {{ haproxy.option('hold refused', resolver_data['hold_refused']) | indent(3) }}
+  {{ haproxy.option('hold nx', resolver_data['hold_nx']) | indent(3) }}
+  {{ haproxy.option('hold timeout', resolver_data['hold_timeout']) | indent(3) }}
+  {{ haproxy.option('hold valid', resolver_data['hold_valid']) | indent(3) }}
+  {{ haproxy.option('hold obsolete', resolver_data['hold_obsolete']) | indent(3) }}
+  {{ haproxy.option('accepted_payload_size', resolver_data['accepted_payload_size']) | indent(3) }}
+{% endfor %}
+{% endif %}
+
+{# MAILERS   -----------------------------------------------------------------#}
+{% if (haproxy__mailers is defined) and haproxy__mailers %}
+
+
+{% for mailer_name, mailer_data in haproxy__mailers.items() %}
+mailers {{ mailer_name }}
+  timeout mail 10s
+  {% for item in mailer_data %}
+  mailer {{ item }} {{ mailer_data[item] }}
+  {% endfor %}
+{% endfor %}
+
+{% endif %}
+
+{# listens ------------------------------------------------------  -----------#}
+{% if (haproxy__listen) is defined and (haproxy__listen) %}
+### LISTEN #####################################################################
+{% for listen_name, listen in haproxy__listen.items() %}
+
+
+listen {{ listen_name }}
+   {% if listen.description is defined %}
+   description {{ listen.description }}
+
+   {% endif %}
+   {% if listen.log is defined %}
+   log {{ listen.log }}
+   {% endif %}
+   {% if listen.mode is defined %}
+   mode {{ listen.mode }}
+
+   {% endif %}
+   {% if listen.timeout is defined and listen.timeout%}
+   {% for _key, _value in listen.timeout.items() %}
+   timeout {{ _key }} {{ _value }}
+   {% endfor %}
+
+   {% endif %}
+   {{ haproxy.options('bind', listen.bind) | indent(3) }}
+   {%- if listen['tcp-request'] is defined %}
+
+   {{ haproxy.options('tcp-request', listen['tcp-request']) | indent(3) }}
+   {% endif %}
+   {% if listen.stats is defined %}
+   stats enable
+   {% if listen.stats.admin is defined %}
+   stats admin if TRUE
+   {% endif %}
+   stats uri {{ listen.stats.uri if listen.stats.uri is defined else '/stats' }}
+   {% if ((listen['stats']['hide-version'] is defined) and (listen['stats']['hide-version']|bool)) or (listen['stats']['hide-version'] is undefined) %}
+   stats hide-version
+   {% endif %}
+   {% if ((listen['stats']['show-legends'] is defined) and (listen['stats']['show-legends']|bool)) %}
+   stats show-legends
+   {% endif %}
+   {% if listen.stats.scope is defined %}
+   stats scope {{ listen.stats.scope|string }}
+   {% endif %}
+   {% if (listen.stats.realm is defined) and listen.stats.realm %}
+   stats realm {{ listen.stats.realm|string }}
+   {% endif %}
+   {% if (listen.stats.auth is defined) and listen.stats.auth %}
+   stats auth {{ listen.stats.auth|string }}
+   {% endif %}
+   {% endif %}
+
+   {% if listen.option is defined %}
+   {{ haproxy.options('option', listen.option) | indent(3) }}
+
+   {% endif %}
+
+   {% if listen.reqadd is defined %}
+   {{ haproxy.options('reqadd', listen.reqadd) | indent(3) }}
+
+   {% endif %}
+   {% if listen.acl is defined %}
+   {{ haproxy.acl(listen.acl) | indent(3) }}
+
+   {% endif %}
+   {% if listen.use_backend is defined %}
+   {{ haproxy.options('use_backend', listen.use_backend) | indent(3) }}
+
+   {% endif %}
+
+   {% if (listen.servers is defined) and (listen.servers) %}
+   {% for __server in listen.servers %}
+   {{ haproxy.servers(__server) }}
+   {% endfor %}
+   {% endif %}
+
+{% endfor %}
+{% endif %}
+
+{# userlists -----------------------------------------------------  -----------#}
+{% if (haproxy__userlist) is defined and (haproxy__userlist) %}
+### USERLISTS ##################################################################
+{% for userlist_name, userlist in haproxy__userlist.items() %}
+
+userlist {{ userlist_name }}
+{% if userlist['user'] is defined %}
+{% for _user in userlist['user'] %}
+  user {{ _user['name'] }} {{ ('password ' + _user['password']) if _user['password'] is defined else ('insecure-password ' + _user['insecure-password']) }}
+{% endfor %}
+{% endif %}
+
+{% endfor %}
+{% endif %}
+{# frontends -----------------------------------------------------  -----------#}
+{% if (haproxy__frontend) is defined and (haproxy__frontend) %}
+### FRONTENDS ##################################################################
+{% for frontend_name, frontend in haproxy__frontend.items() %}
+
+
+frontend {{ frontend_name }}
+   {% if frontend.description is defined %}
+   description {{ frontend.description }}
+   {% endif %}
+   {% if frontend.mode is defined %}
+
+   mode {{ frontend.mode }}
+   {% endif %}
+   {{ haproxy.options('bind', frontend.bind) | indent(3) }}
+   {% if frontend.option is defined %}
+
+   {{ haproxy.options('option', frontend.option) | indent(3) }}
+   {% endif %}
+   {% if (frontend['log-format'] is defined) and (frontend['log-format']) %}
+   log-format "{{ frontend['log-format'] }}"
+   {% endif %}
+   {% if (frontend['log-format-sd'] is defined) and (frontend['log-format-sd']) %}
+   log-format-sd "{{ frontend['log-format-sd'] }}"
+   {% endif %}
+   {% if frontend['capture'] is defined %}
+   {{ haproxy.options('capture', frontend.capture) | indent(3) }}
+   {% endif %}
+   {%- if frontend.errorfile is defined %}
+   {% for _errorcode, _errorfile in  frontend.errorfile.items() %}
+   errorfile {{ _errorcode }} {{ _errorfile }}
+   {% endfor %}
+   {% endif %}
+
+   {% if frontend.acl is defined %}
+
+   {{ haproxy.acl(frontend.acl) | indent(3) }}
+
+   {% endif %}
+
+   {%- if frontend['http-request'] is defined %}
+   {{ haproxy.options('http-request', frontend['http-request']) | indent(3) }}
+   {% endif %}
+   {%- if frontend['http-response'] is defined %}
+   {{ haproxy.options('http-response', frontend['http-response']) | indent(3) }}
+   {% endif %}
+   {%- if frontend['tcp-request'] is defined %}
+   {{ haproxy.options('tcp-request', frontend['tcp-request']) | indent(3) }}
+   {% endif %}
+   {%- if frontend.rspidel is defined %}
+   {{ haproxy.options('rspidel', frontend.rspidel) | indent(3) }}
+   {% endif %}
+   {%- if frontend.rspadd is defined %}
+   {{ haproxy.options('rspadd', frontend.rspadd) | indent(3) }}
+   {% endif %}
+   {%- if frontend.reqadd is defined %}
+   {{ haproxy.options('reqadd', frontend.reqadd) | indent(3) }}
+   {% endif %}
+   {% if frontend.use_backend is defined %}
+   {{ haproxy.options('use_backend', frontend.use_backend) | indent(3) }}
+
+   {% endif %}
+
+   {%- if frontend.default_backend is defined %}
+
+   default_backend  {{ frontend.default_backend }}
+   {% endif %}
+
+   {#- TIMEOUTS -#}
+   {% if frontend['timeouts'] is defined %}
+   {%   for timeout in frontend['timeouts'].items() %}
+   timeout {{timeout[0]}} {{timeout[1]}}
+   {%   endfor %}
+   {% endif %}
+
+
+{% endfor %}
+{% endif %}
+
+{# backends -----------------------------------------------------  -----------#}
+{% if (haproxy__backends) is defined and (haproxy__backends) %}
+### BACKENDS ###################################################################
+{% for backend_name, backend in haproxy__backends.items() %}
+
+
+backend {{ backend_name }}
+   {% if backend.description is defined %}
+   description {{ backend.description }}
+   {% endif %}
+   {% if backend.mode is defined %}
+   mode {{ backend.mode }}
+   {% endif %}
+   {% if backend.fullconn is defined and backend.fullconn %}
+   fullconn {{ backend.fullconn }}
+   {% endif %}
+   {% if  backend['timeout'] is defined and backend['timeout']['http-request'] is defined  %}
+   timeout http-request {{ backend['timeout']['http-request'] }}
+   {% endif %}
+   {% if backend.option is defined %}
+   {{ haproxy.options('option', backend.option) | indent(3) }}
+   {% endif %}
+
+   {% if backend.acl is defined %}
+
+   {{ haproxy.acl(backend.acl) | indent(3) }}
+   
+   {% endif %}
+
+   {% if backend.reqrep is defined and backend.reqrep %}
+   {{ haproxy.options('reqrep', backend.reqrep) | indent(3) }}
+   {% endif %}
+   {% if backend.reqirep is defined and backend.reqirep %}
+   {{ haproxy.options('reqirep', backend.reqirep) | indent(3) }}
+   {% endif %}
+   {% if backend['http-request'] is defined and backend['http-request'] %}
+   {{ haproxy.options('http-request', backend['http-request']) | indent(3) }}
+   {% endif %}
+   {% if backend['http-response'] is defined and backend['http-response'] %}
+   {{ haproxy.options('http-response', backend['http-response']) | indent(3) }}
+   {% endif %}
+
+   {%- if backend.errorfile is defined %}
+   {% for _errorcode, _errorfile in  backend.errorfile.items() %}
+   errorfile {{ _errorcode }} {{ _errorfile }}
+   {% endfor %}
+   {% endif %}
+
+   {% if backend.balance is defined %}
+   {{ haproxy.option('balance', backend.balance) | indent(3) }}
+   {% endif %}
+   {% if backend.compression is defined and backend.compression %}
+
+   {{ haproxy.options('compression', backend.compression) | indent(3) }}
+   {% endif %}
+
+   {#- MAILERS -#}
+   {% if backend['email-alert'] is defined %}
+
+   email-alert mailers {{ backend['email-alert']['mailers'] }}
+   email-alert from {{ backend['email-alert']['from']|default(haproxy__user+'@localhost') }}
+   email-alert to {{ backend['email-alert']['to'] }}
+   {% endif %}
+   {% if backend['redirect'] is defined %}
+   {{ haproxy.options('redirect', backend.redirect) | indent(3) }}
+   {% endif %}
+   {#- TIMEOUTS -#}
+   {% if backend['timeouts'] is defined %}
+   {%   for timeout in backend['timeouts'].items() %}
+   timeout {{timeout[0]}} {{timeout[1]}}
+   {%   endfor %}
+   {% endif %}
+
+   {#- SERVERS -#}
+   {% if (backend.servers is defined) and (backend.servers) %}
+
+   {% for __server in backend.servers %}
+   {{ haproxy.servers(__server) }}
+   {% endfor %}
+   {% endif %}
+   {# SERVERS-TEMPLATE #}
+   {% if (backend.templates is defined) and (backend.templates) %}
+
+   {% for __server in backend.templates %}
+   {{ haproxy.server_templates(__server) }}
+   {% endfor %}
+   {% endif %}
+
+{% endfor %}
+{% endif %}

@@ -1,0 +1,36 @@
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+-A PREROUTING -i eth2 -p tcp -m tcp --dport 80 -j DNAT --to-destination {{ balancer_ip }}:80
+-A PREROUTING -i eth2 -p tcp -m tcp --dport 443 -j DNAT --to-destination {{ balancer_ip }}:443
+-A POSTROUTING --destination {{ balancer_ip }}/32 -p tcp -m tcp --sport 80 -j SNAT --to-source {{ ansible_host }}
+-A POSTROUTING --destination {{ balancer_ip }}/32 -p tcp -m tcp --sport 443 -j SNAT --to-source {{ ansible_host }}
+# -A POSTROUTING -d {{ balancer_ip }}/32 -j SNAT --to-source {{ hostvars[ 'inetRouter' ].ansible_eth0.ipv4.address }}
+-A POSTROUTING -s {{ routers_net }} -o eth0 -j MASQUERADE
+-A POSTROUTING -s {{ front_net }} -o eth0 -j MASQUERADE
+-A POSTROUTING -s {{ back_net }} -o eth0 -j MASQUERADE
+COMMIT
+
+*filter
+:INPUT DROP [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+-A INPUT -i lo -m comment --comment "Allow local" -j ACCEPT
+-A INPUT -m state --state RELATED,ESTABLISHED -m comment --comment "Allow established connections" -j ACCEPT
+-A INPUT -p tcp -m tcp --tcp-flags SYN,ACK SYN,ACK -m state --state NEW -j REJECT --reject-with tcp-reset
+-A INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m state --state NEW -m comment --comment "New not syn" -j DROP
+-A INPUT -s {{ routers_net }} -j ACCEPT
+-A INPUT -s {{ front_net }} -j ACCEPT
+-A INPUT -s {{ back_net }} -j ACCEPT
+-A INPUT -p icmp -m comment --comment "Allow ICMP" -j ACCEPT
+-A INPUT -d {{ ansible_host }}/32 -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT
+-A INPUT -d {{ hostvars[ 'inetRouter' ].ansible_eth0.ipv4.address }}/32 -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT
+-A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -s {{ routers_net }} -j ACCEPT
+-A FORWARD -s {{ front_net }} -j ACCEPT
+-A FORWARD -s {{ back_net }} -j ACCEPT
+-A FORWARD -d {{ balancer_ip }}/32 -p tcp -m tcp --dport 80 -j ACCEPT
+-A FORWARD -d {{ balancer_ip }}/32 -p tcp -m tcp --dport 443 -j ACCEPT
+COMMIT

@@ -1,0 +1,249 @@
+ansible_port: 22
+ansible_user: vagrant
+
+# Netwoks
+front_net: 172.16.1.0/29
+back_net: 192.168.2.0/28
+routers_net: 10.10.255.0/30
+balancer_ip: "{{ hostvars[ 'router-lb' ].ansible_eth2.ipv4.address }}"
+ 
+
+# PostreSQL vars
+pg_listen_addresses: '*'
+master_ip: "{{ hostvars[ 'back-node1' ].ansible_eth1.ipv4.address }}"
+slave_ip: "{{ hostvars[ 'back-node2' ].ansible_eth1.ipv4.address }}"
+replicator_password: 'Otus2023!'
+postgresql_hba_entries:
+  - { type: local, database: all, user: postgres, auth_method: peer }
+  - { type: local, database: all, user: all, auth_method: peer }
+  - { type: host, database: all, user: all, address: '127.0.0.1/32', auth_method: md5 }
+  - { type: host, database: all, user: all, address: '172.16.1.0/29', auth_method: md5 }
+
+frontend_db: 'front_db'
+frontend_db_user: 'frontend'
+frontend_db_passwors: 'A!NdfUG249'
+
+barman_master_node: 'back-node1'
+barman_node_name: 'backup'
+barman_ip: "{{ hostvars[ 'backup' ].ansible_eth1.ipv4.address }}"
+barman_user: 'barman'
+barman_user_password: 'Otus2023b'
+
+
+# DRBD vars
+drbd_node1_address: "{{ hostvars[ 'back-node1' ].ansible_eth1.ipv4.address }}"
+drbd_node2_address: "{{ hostvars[ 'back-node2' ].ansible_eth1.ipv4.address }}"
+drbd_node1_name: back-node1
+drbd_node2_name: back-node2
+drbd_allow_two_primaries: 'yes'
+
+
+# NFS cluster vars
+nfs_exports:
+  - { path: '/srv/share', network: "{{ front_net }}", mout_opts: 'rw,sync,no_subtree_check,insecure,fsid=0' }
+  - { path: '/srv/share', network: '192.168.2.13/30', mout_opts: 'rw,sync,no_subtree_check,insecure,fsid=0' }
+  # Опция rw устанавливает экспорт на чтение/запись. sync обеспечивает синхронизацию изменений с диском. no_subtree_check отключает проверку подкаталогов.
+nfs_server: '192.168.2.3'
+nnfs_client_mnt_point: "/var/www/static"
+
+
+# Rsyslog
+rsyslog_server_ip: "{{ hostvars[ 'rsyslog' ].ansible_eth1.ipv4.address }}"
+
+# Pacemaker variables
+corosync_wait_for_all: false
+pacemaker_cluster_group: 'back_nodes'
+pacemaker_cluster_constraints:
+  # - constraint: 'colocation'
+  #   action: 'add'
+  #   source_resource_id: 'virtual_ip'
+  #   target_resource_id: 'mount_fs'
+  - constraint: 'colocation'
+    action: 'add'
+    source_resource_id: 'NFS_home'
+    target_resource_id: 'virtual_ip'
+  - constraint: 'colocation'
+    action: 'add'
+    source_resource_id: 'NFS_home_sh'
+    target_resource_id: 'NFS_home'
+  - constraint: 'colocation'
+    action: 'add'
+    source_resource_id: 'NFS_home_sh2'
+    target_resource_id: 'NFS_home'
+
+  - constraint: 'order'
+    # order:
+    #   first_resource: 'virtual_ip'
+    #   first_resource_action: 'start'
+    #   second_resource: 'mount_fs'
+  - constraint: 'order'
+    order:
+      first_resource: 'NFS_home'
+      first_resource_action: 'start'
+      second_resource: 'virtual_ip'
+  - constraint: 'order'
+    order:
+      first_resource: 'NFS_home_sh'
+      first_resource_action: 'start'
+      second_resource: 'NFS_home'
+  - constraint: 'order'
+    order:
+      first_resource: 'NFS_home_sh2'
+      first_resource_action: 'start'
+      second_resource: 'NFS_home'
+
+pacemaker_cluster_resources:
+  # - resource_id: 'mount_fs'
+  #   action: 'create'
+  #   provider: 'Filesystem'
+  #   options:
+  #     - 'device="/dev/drbd0"'
+  #     - 'directory={{ /srv/share }}'
+  #     - 'fstype="ext4"'
+  - resource_id: 'virtual_ip'
+    action: 'create'
+    provider: 'ocf:heartbeat:IPaddr2'
+    options:
+      - 'ip={{ nfs_server }}'
+      - 'cidr_netmask=29'
+    op: 'monitor'
+    op_options:
+      - 'interval=30s'
+  - resource_id: 'NFS_home'
+    action: 'create'
+    provider: 'nfsserver'
+    options:
+      - 'nfs_shared_infodir=/srv/share'
+      - 'nfs_ip={{ nfs_server }}'
+  - resource_id: 'NFS_home_sh'
+    action: 'create'
+    provider: 'exportfs'
+    options:
+      - 'clientspec={{ front_net }}'
+      - 'options=rw,sync,no_subtree_check,insecure'
+      - 'directory=/srv/share fsid=0'
+  - resource_id: 'NFS_home_sh2'
+    action: 'create'
+    provider: 'exportfs'
+    options:
+      - 'clientspec=192.168.2.13/30'
+      - 'options=rw,sync,no_subtree_check,insecure'
+      - 'directory=/srv/share fsid=0'
+
+pacemaker_cluster_settings:
+  - property: 'start-failure-is-fatal'
+    value: 'false'
+  - property: 'pe-warn-series-max'
+    value: 10
+  - property: 'pe-input-series-max'
+    value: 10
+  - property: 'pe-error-series-max'
+    value: 10
+  - property: 'cluster-recheck-interval'
+    value: 1min
+
+
+# HAProxy load balancer
+haproxy__frontend:
+  exampleprogect.loc:
+    bind: 
+      - ':80'
+      - ':443 ssl crt /etc/haproxy/ssl/exampleprogect.loc.pem'
+    mode: http
+    'http-request':
+      - redirect scheme https unless { ssl_fc }
+    use_backend: 
+      - backens_web
+    
+    option:
+      - httplog
+
+haproxy__ssl_files:
+  'exampleprogect.loc.pem': "{{ lookup('file', './files/cert.pem') }}"
+
+# haproxy__frontend: dict
+# docs: List of frontends
+# Example:
+# haproxy__frontend: {}
+#   http-in:
+#     bind: [':80']
+#     mode: tcp
+#     'http-request':
+#       - deny if { path -i -m beg /api } !{ src 10.0.0.0/16 }
+#     reqadd:
+#     - 'X-Forwarded-Proto:\ https if { ssl_fc }'
+#     - 'HTTPS:\ on if { ssl_fc }'
+#
+#   stats:
+#     bind: [127.0.0.1:71]
+#     option: [httplog]
+#     reqadd: ['X-Forwarded-Proto:\ https if { ssl_fc }']
+#     #acl: [ssss]
+#
+#   http-private:
+#     mode: http
+#     bind:
+#     - 127.0.0.1:89
+#     - 127.0.0.1:8080
+#     option:
+#      - httplog
+#      - dontlognull
+#     capture:
+#       - request header Host len 25
+#     errorfile:
+#        503: /usr/share/haproxy/503.http
+
+
+  # nfs-in:
+  #   bind: 
+  #     - ':2049'
+  #     - ':111'
+  #     - ':20048'
+  #   mode: tcp
+  #   use_backend:
+  #     - backens_nfs1
+  #     - backens_nfs2
+  #     - backens_nfs3
+haproxy__backends:
+  backens_web:
+    mode: http
+    balance: roundrobin
+    timeout:
+      http-request: 30s
+    servers:
+    - name: front-node1
+      address: 172.16.1.2:80
+      param:
+        weight: 10
+        check:
+        minconn: 1
+        maxconn: 1500
+    - name: front-node2
+      address: 172.16.1.4:80
+      param:
+        weight: 10
+        check:
+          minconn: 1
+          maxconn: 1500
+
+  # backens_nfs1:
+  #   mode: tcp
+  #   servers:
+  #   - name: front-node1
+  #     address: 192.168.2.4:2049
+  #   - name: front-node2
+  #     address: 192.168.2.6:2049
+  # backens_nfs2:
+  #   mode: tcp
+  #   servers:
+  #   - name: front-node1
+  #     address: 192.168.2.4:111
+  #   - name: front-node2
+  #     address: 192.168.2.6:111
+  # backens_nfs3:
+  #   mode: tcp
+  #   servers:
+  #   - name: front-node1
+  #     address: 192.168.2.4:20048
+  #   - name: front-node2
+  #     address: 192.168.2.6:20048

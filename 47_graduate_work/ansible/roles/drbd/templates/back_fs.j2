@@ -1,0 +1,19 @@
+resource back_fs {
+	on {{ drbd_node1_name }} {
+	device /dev/drbd0;
+		disk /dev/sdb1;
+			meta-disk internal;	
+				address {{ drbd_node1_address }}:7789;
+	}
+	on {{ drbd_node2_name }} {
+	device /dev/drbd0;
+			disk /dev/sdb1;
+			meta-disk internal;
+				address {{ drbd_node2_address }}:7789;
+	}
+	net {
+		protocol {{ drbd_protocol }};
+		allow-two-primaries {{ drbd_allow_two_primaries }};
+		fencing resource-and-stonith;
+	}
+}

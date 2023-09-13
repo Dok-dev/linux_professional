@@ -1,0 +1,13 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp0s8:
+      addresses:
+      - {{ hostvars[inventory_hostname].ansible_enp0s8.ipv4.address }}/29
+      routes:
+      - to: 0.0.0.0/0
+        via: {{ hostvars[ 'router-lb' ].ansible_eth2.ipv4.address }} 
+    enp0s19:
+      addresses:
+      - {{ ansible_host }}/24

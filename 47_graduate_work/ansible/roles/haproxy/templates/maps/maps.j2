@@ -1,0 +1,13 @@
+{{ ansible_managed|comment }}
+
+{% if  (haproxy__map_files[item] is defined) and (haproxy__map_files[item] is not none) %}
+{% for _entry in haproxy__map_files[item] %}
+{{ _entry|string }}
+{% endfor %}
+{% endif %}{{ ansible_managed|comment }}
+
+{% if  (haproxy__map_files[item] is defined) and (haproxy__map_files[item] is not none) %}
+{% for _entry in haproxy__map_files[item] %}
+{{ _entry|string }}
+{% endfor %}
+{% endif %}

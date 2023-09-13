@@ -1,0 +1,5 @@
+---
+# handlers file for drbd
+- name: Reboot to get the new core
+  ansible.builtin.reboot:
+    reboot_timeout: 120

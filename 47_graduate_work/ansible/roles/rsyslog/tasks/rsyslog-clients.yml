@@ -1,0 +1,114 @@
+---
+
+- name: Install audispd-plugins for Ubuntu nodes
+  block:
+  - name: Inastall packages
+    apt:
+      name: 
+        - audispd-plugins
+        - auditd
+      state: latest
+      update_cache: true
+
+  - name: Update /etc/audisp/plugins.d/syslog.conf
+    template:
+      src: etc/audisp/plugins.d/syslog.conf.j2
+      dest: /etc/audisp/plugins.d/syslog.conf
+      owner: root
+      group: root
+      mode: 0644
+    notify: restart auditd
+
+  when: ansible_facts.distribution == 'Ubuntu'
+
+- name: Install and configure audispd-plugins on CentOS nodes
+  block:
+
+  - name: Update rpm
+    ansible.builtin.command: |
+       dnf -y update rpm
+  # dnf makecache --refresh
+    when: ansible_facts.distribution_major_version == '8'
+
+  # Установка EPEL-release 8
+  - name: Import a key from a url
+    ansible.builtin.rpm_key:
+      state: present
+      key: https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+    when: ansible_facts.distribution_major_version == '8'
+
+  - name: Install audispd-plugins for CentOS nodes
+    yum:
+      name: audispd-plugins
+      state: latest
+      update_cache: true
+      disable_gpg_check: true
+
+  - name: Update /etc/audit/plugins.d/au-remote.conf
+    template:
+      src: etc/audisp/audisp-remote.conf.j2
+      dest: /etc/audit/plugins.d/au-remote.conf
+      owner: root
+      group: root
+      mode: 0644
+    notify: restart auditd
+    when: ansible_facts.distribution_major_version == '8'
+
+  - name: Update /etc/audisp/plugins.d/syslog.conf
+    template:
+      src: etc/audisp/plugins.d/syslog.conf.j2
+      dest: /etc/audit/plugins.d/syslog.conf
+      owner: root
+      group: root
+      mode: 0644
+    notify: restart auditd
+    when: ansible_facts.distribution_major_version == '8'
+
+  - name: Update /etc/audisp/plugins.d/syslog.conf
+    template:
+      src: etc/audisp/plugins.d/syslog.conf.j2
+      dest: /etc/audisp/plugins.d/syslog.conf
+      owner: root
+      group: root
+      mode: 0644
+    notify: restart auditd
+    when: ansible_facts.distribution_major_version == '7'
+
+  when: ansible_facts.distribution == 'CentOS'
+
+- name: Update /etc/audisp/audisp-remote.conf
+  template:
+    src: etc/audisp/audisp-remote.conf.j2
+    dest: /etc/audisp/audisp-remote.conf
+    owner: root
+    group: root
+    mode: 0644
+  notify: restart auditd
+  when: not ((ansible_facts.distribution == 'CentOS') and (ansible_facts.distribution_major_version == '8'))
+
+- name: Update /etc/audit/rules.d/audit.rules 
+  template:
+    src: etc/audit/rules.d/audit.rules.j2
+    dest: /etc/audit/rules.d/audit.rules
+    owner: root
+    group: root
+    mode: 0600
+  notify: restart auditd
+
+- name: Update /etc/audit/auditd.conf
+  template:
+    src: etc/audit/auditd.conf.j2
+    dest: /etc/audit/auditd.conf
+    owner: root
+    group: root
+    mode: 0600
+  notify: restart auditd
+
+- name: Update /etc/rsyslog.conf
+  template:
+    src: rsyslog_client.conf.j2
+    dest: /etc/rsyslog.conf
+    owner: root
+    group: root
+    mode: 0644
+  notify: restart rsyslog

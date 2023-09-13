@@ -1,0 +1,77 @@
+---
+
+- name: Network configuration
+  hosts: all
+  become: true
+  gather_facts: true
+  pre_tasks:
+  - ansible.builtin.include_tasks: tasks/common.yml
+  - ansible.builtin.include_tasks: tasks/network.yml
+  roles:
+  - node_exporter
+  - rsyslog
+
+- name: Setup monitoring
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  roles:
+  - blackbox_exporter
+  - prometheus
+  - alertmanager
+  - grafana
+
+- name: Setup load balancer
+  hosts: router-lb
+  become: true
+  gather_facts: true
+  roles:
+  - haproxy
+
+- name: Setup backend storages
+  hosts: back-node1, back-node2
+  become: true
+  gather_facts: true
+  pre_tasks:
+  - ansible.builtin.include_tasks: tasks/create_parts.yml
+  roles:
+  - drbd
+  tasks:
+  - ansible.builtin.include_tasks: tasks/create_fs.yml
+
+- name: Setup backend services
+  hosts: back-node1, back-node2
+  become: true
+  gather_facts: true
+  roles:
+  - nfs
+  - postgresql
+  - postgres_replication
+  - pacemaker
+  tasks:
+  - ansible.builtin.include_tasks: tasks/front_db.yml
+    when: ansible_hostname == 'back-node1'
+
+- name: Setup frontend services
+  hosts: front-node1, front-node2
+  become: true
+  gather_facts: true
+  roles:
+   - nfs
+  tasks:
+  - ansible.builtin.import_tasks: tasks/front_prep.yml
+
+- name: Setup barman 
+  hosts: back-node1, back-node2, backup
+  become: true
+  roles:
+  - barman
+  # tasks:
+  # - ansible.builtin.import_tasks: tasks/backup_tests.yml
+
+- name: Setup backup
+  hosts: backup
+  become: true
+  roles:
+  - nfs
+  - borg

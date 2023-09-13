@@ -1,0 +1,23 @@
+---
+# block device (disk) on which to create the exported filesystem.
+# if the disk is not defined, formatting and mounting will not be done.
+nfs_disk_dev:
+
+# Exported filesystem mountpoints on nfs servers
+nfs_exports:
+  - { path: '/srv/share', network: '*', mout_opts: 'rw,insecure,no_root_squash' }
+
+# Path to mountpoint on nfs clients
+nfs_client_mnt_point: "/mnt"
+
+# nfs client mount options
+nfs_client_mnt_options: ''
+
+# mode install selector
+nfs_mode:
+  server: false
+  clients: false
+
+nfs_export:
+  path: '/srv/share'
+  mout_opts: "{{ nfs_client_mnt_options }}"

@@ -1,0 +1,26 @@
+---
+
+- name: Ensure rsyslog is instaled
+  ansible.builtin.yum:
+    name: rsyslog
+    state: present
+  become: true
+
+- name: Create /var/log/remote directory
+  file:
+    path: /var/log/remote
+    state: directory
+    mode: 0755
+    owner: root
+    group: root
+  notify: restart rsyslog
+
+- name: Update /etc/rsyslog.conf file
+  template:
+    src: rsyslog.conf.j2
+    dest: /etc/rsyslog.conf
+    owner: root
+    group: root
+    mode: 0644
+  notify: restart rsyslog
+

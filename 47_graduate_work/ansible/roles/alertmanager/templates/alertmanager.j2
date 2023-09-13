@@ -1,0 +1,28 @@
+global:
+  resolve_timeout: 5m
+  telegram_api_url: "https://api.telegram.org"
+
+
+receivers:
+  - name: stardata-telegram
+  - name: blackhole
+    telegram_configs:
+      - bot_token: {{ tegram_bot_token }}
+        api_url: "https://api.telegram.org"
+        chat_id: {{ tegram_chat_id }}
+        parse_mode: ''
+
+route:
+  group_by: ['ds_id'] # Алерты группируются по UUID кластера.
+  group_wait: 15s
+  group_interval: 30s
+  repeat_interval: 12h
+  receiver: stardata-telegram
+  routes:
+    - receiver: stardata-telegram
+      continue: true
+      matchers:
+        - severity="critical"
+    - receiver: blackhole
+      matchers:
+        - alertname="Watchdog"

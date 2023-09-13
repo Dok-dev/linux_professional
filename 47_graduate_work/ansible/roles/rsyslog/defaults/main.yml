@@ -1,0 +1,5 @@
+---
+rsyslog_server_ip: 192.168.2.12
+rsyslog_server_port: 514
+auditd_write_logs: "yes"
+rsyslog_server_mode: false

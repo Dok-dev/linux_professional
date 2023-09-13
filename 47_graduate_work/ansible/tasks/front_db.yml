@@ -1,0 +1,37 @@
+---
+- name: Add database and table
+  block:
+  - name: Create front database on node1
+    become_user: postgres
+    community.postgresql.postgresql_db:
+      name: '{{ frontend_db }}'
+      encoding: UTF-8
+      template: template0
+      state: present
+
+  - name: Add frontend table
+    become_user: postgres
+    community.postgresql.postgresql_table:
+      db: '{{ frontend_db }}'
+      name: front_info
+      columns:
+        - name VARCHAR (255) PRIMARY KEY
+      state: present
+  when: ansible_hostname == 'back-node1'
+
+- name: Create frontend user
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: '{{ frontend_db_user }}'
+    password: '{{ frontend_db_passwors }}'
+
+- name: Grant privs to front database
+  become_user: postgres
+  community.postgresql.postgresql_privs:
+    db: postgres
+    obj: '{{ frontend_db }}'
+    type: database
+    state: present
+    privs: ALL
+    roles: '{{ frontend_db_user }}'
+    grant_option: true

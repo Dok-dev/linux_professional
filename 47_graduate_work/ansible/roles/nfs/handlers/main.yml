@@ -1,0 +1,8 @@
+---
+- name: re-export filesystem
+  command: exportfs -r
+
+- name: restart NFS service
+  ansible.builtin.service:
+    name: nfs-server
+    state: restarted

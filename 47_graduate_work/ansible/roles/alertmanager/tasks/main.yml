@@ -1,0 +1,69 @@
+---
+- name: Create alertmanager user group
+  ansible.builtin.group: name="{{groupId}}"
+  become: true
+
+- name: Create alertmanager user
+  ansible.builtin.user:
+    name: "{{userId}}"
+    group: "{{groupId}}"
+    system: yes
+    shell: "/sbin/nologin"
+    comment: "{{userId}} nologin User"
+    createhome: "no"
+    state: present
+
+- name: Download alertmanager
+  ansible.builtin.unarchive:
+    src: "https://github.com/prometheus/alertmanager/releases/download/v{{ version }}/alertmanager-{{ version }}.linux-amd64.tar.gz"
+    dest: /tmp/
+    creates: /tmp/alertmanager-{{ version }}.linux-amd64/
+    remote_src: yes
+
+- name: Copy alertmanager executable to bin
+  ansible.builtin.copy:
+    src: "/tmp/alertmanager-{{ version }}.linux-amd64/alertmanager"
+    dest: "/usr/local/bin/alertmanager"
+    owner: "{{userId}}"
+    group: "{{groupId}}"
+    remote_src: yes
+    mode: 0755
+
+- name: Create data directory
+  ansible.builtin.file:
+    path: "/data/alertmanager/"
+    state: directory
+    owner: "{{userId}}"
+    group: "{{groupId}}"
+    mode: 0755
+
+- name: Create config directory
+  ansible.builtin.file:
+    path: "/etc/alertmanager/"
+    state: directory
+    owner: "{{userId}}"
+    group: "{{groupId}}"
+    mode: 0755
+
+- name: Copy config file
+  ansible.builtin.template:
+    src: alertmanager.j2
+    dest: /etc/alertmanager/alertmanager.yml
+
+- name: Copy systemd init file
+  ansible.builtin.template:
+    src: init.service.j2
+    dest: /etc/systemd/system/alertmanager.service
+  notify: systemd_reload
+
+- name: Start alertmanager service
+  ansible.builtin.service:
+    name: alertmanager
+    state: started
+    enabled: true
+
+- name: Check if alertmanager is accessible
+  ansible.builtin.uri:
+    url: http://localhost:9093
+    method: GET
+    status_code: 200

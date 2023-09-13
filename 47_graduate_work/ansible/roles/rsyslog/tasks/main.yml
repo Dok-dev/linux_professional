@@ -1,0 +1,16 @@
+---
+
+- name: Install EPEL Repo package from standart repo
+  ansible.builtin.yum:
+    name: epel-release
+    state: present
+  become: true
+  when: ansible_facts.distribution == 'CentOS'
+
+- name: Rsyslog server setup
+  include_tasks: rsyslog-server.yml
+  when: rsyslog_server_mode
+
+- name: Rsyslog clients setup
+  include_tasks: rsyslog-clients.yml
+  when: not rsyslog_server_mode

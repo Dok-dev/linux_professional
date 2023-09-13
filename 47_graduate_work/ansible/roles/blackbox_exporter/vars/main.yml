@@ -1,0 +1,5 @@
+---
+serviceName: "blackbox_exporter"
+userId: "blackbox"
+groupId: "blackbox"
+exec_command: /usr/local/bin/blackbox_exporter

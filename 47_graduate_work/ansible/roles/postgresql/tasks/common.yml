@@ -1,0 +1,32 @@
+---
+
+- name: Set time zone
+  ansible.builtin.copy:
+    remote_src: True
+    src: /usr/share/zoneinfo/Europe/Moscow
+    dest: /etc/localtime
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Restart service cron on centos
+  ansible.builtin.systemd:
+    state: restarted
+    daemon_reload: true
+    name: crond
+
+- name: Disable firewalld service
+  service:
+    name: firewalld
+    state: stopped
+    enabled: false
+
+- name: Disable SELinux
+  selinux:
+    state: disabled
+
+- name: Ensure SELinux is set to disable mode
+  lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX='
+    line: SELINUX=disabled

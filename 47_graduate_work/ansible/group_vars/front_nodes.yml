@@ -1,0 +1,9 @@
+---
+nfs_mode:
+  server: false
+  clients: true
+
+nfs_export:
+  path: '/srv/share'
+  network: "{{ front_net }}"
+  mout_opts: 'rw'

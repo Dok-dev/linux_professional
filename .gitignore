@@ -11,3 +11,4 @@ commit_version
 .vagrant
 *.vdi
 *.iso
+**/private.key

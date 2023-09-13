@@ -1,0 +1,13 @@
+galaxy_info:
+  author: your name
+  description: Prometheus role
+  company: your company (optional)
+
+  license: BSD
+
+  min_ansible_version: 2.1
+
+  galaxy_tags: []
+
+dependencies: []
+

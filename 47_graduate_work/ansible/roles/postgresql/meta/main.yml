@@ -1,0 +1,15 @@
+---
+dependencies: []
+
+galaxy_info:
+  role_name: postgresql
+  author:
+    - me
+  description: Install and configure PostgreSQL
+  company: X
+  license: MIT / BSD
+  min_ansible_version: 2.7
+  platforms:
+    - name: centos/stream8
+
+  galaxy_tags: []

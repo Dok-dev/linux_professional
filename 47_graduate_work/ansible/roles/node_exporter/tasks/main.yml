@@ -1,0 +1,56 @@
+---
+
+- name: Create node_exporter user group
+  group: name="{{groupId}}"
+  become: true
+
+- name: Create node_exporter user
+  user:
+    name: "{{userId}}"
+    group: "{{groupId}}"
+    system: true
+    shell: "/sbin/nologin"
+    comment: "{{userId}} nologin User"
+    createhome: "no"
+    state: present
+
+- name: Download prometheus node exporter
+  unarchive:
+    src: "https://github.com/prometheus/node_exporter/releases/download/v{{ version }}/node_exporter-{{ version }}.linux-amd64.tar.gz"
+    dest: /tmp/
+    creates: /tmp/node_exporter-{{ version }}.linux-amd64/
+    remote_src: true
+
+- name: Copy prometheus node exporter binary file
+  copy:
+    src: "/tmp/node_exporter-{{ version }}.linux-amd64/node_exporter"
+    dest: "/usr/local/bin/node_exporter"
+    owner: "{{userId}}"
+    group: "{{groupId}}"
+    remote_src: true
+    mode: 0755
+
+- name: Copy systemd unit file
+  template:
+    src: init.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+
+- name: Start node_exporter service
+  service:
+    name: node_exporter
+    state: started
+    enabled: true
+
+# - name: Allow prometheus node exporter port
+#   firewalld:
+#     port: '9100/tcp'
+#     permanent: true
+#     state: enabled
+#   notify: restart firewalld
+#   when: inventory_hostname == 'inetRouter'
+
+- name: Check if node exporter emits metrices
+  uri:
+    url: http://127.0.0.1:9100/metrics
+    method: GET
+    status_code: 200

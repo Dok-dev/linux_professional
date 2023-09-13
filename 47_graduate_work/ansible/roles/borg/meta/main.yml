@@ -1,0 +1,10 @@
+galaxy_info:
+  author: My
+  description: Borg backup
+  company: me
+
+  license: BSD
+
+  min_ansible_version: 2.1
+  galaxy_tags: []
+dependencies: []

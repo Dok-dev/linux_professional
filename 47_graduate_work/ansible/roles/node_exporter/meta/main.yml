@@ -1,0 +1,10 @@
+galaxy_info:
+  author: your name
+  description: Prometheus node exporter
+  company: your company (optional)
+
+  license: BSD
+
+  galaxy_tags: []
+
+dependencies: []

@@ -1,0 +1,9 @@
+grafana_dashboards:
+  - dashboard_id: 1860
+    revision_id: 21
+    name: prometheus
+  - dashboard_id: 7587
+    revision_id: 3
+    name: blackbox
+
+version: 5.4.3

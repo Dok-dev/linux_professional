@@ -1,0 +1,12 @@
+nfs_client_mnt_point: /var/backup
+
+nfs_mode:
+  server: false
+  clients: true
+
+nfs_export:
+  path: '/srv/share'
+  network: '192.168.2.13/30'
+  mout_opts: 'rw'
+
+borg_backup_directory: /var/backup_static

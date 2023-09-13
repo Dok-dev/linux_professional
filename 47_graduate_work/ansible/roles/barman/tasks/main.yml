@@ -1,0 +1,231 @@
+---
+# Установка необходимых пакетов для работы с postgres и пользователями
+- name: install base tools
+  dnf:
+    name:
+      - python3-pexpect.noarch
+      - python3-psycopg2
+      - bash-completion 
+      - wget 
+    state: present
+    update_cache: true
+
+# Отключаем firewalld и удаляем его из автозагрузки
+- name: disable firewalld service
+  service:
+    name: firewalld
+    state: stopped
+    enabled: false
+  when: barman_node
+
+  # Отключаем SElinux
+- name: Disable SELinux
+  selinux:
+    state: disabled
+  when: barman_node
+
+- name: Ensure SELinux is set to disable mode
+  lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX='
+    line: SELINUX=disabled
+  when: barman_node
+
+# Добавляем postgres репозиторий на хост barman
+- name: install postgres repo
+  dnf:
+    name: 'https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm'
+    state: present
+    disable_gpg_check: true
+  when: barman_node
+
+#  Отключение старого postgres-модуля
+- name: disable old postgresql module
+  shell: dnf -qy module disable postgresql
+  when: barman_node
+
+#  Установка EPEL-release
+- name: install epel-release
+  dnf:
+    name:
+      - epel-release
+    state: present
+    update_cache: true
+
+#  Установка пакетов barman и stgresql-client на сервер barman 
+- name: install barman and postgresql packages on barman
+  dnf:
+    name:
+      - barman
+      - barman-cli
+      - postgresql14
+    state: present
+    update_cache: true
+  when: barman_node
+
+#  Установка пакетов barman-cli на серверах node1 и node2 
+- name: install barman-cli and postgresql packages on nodes
+  dnf:
+    name:
+      - barman-cli
+    state: present
+    update_cache: true
+  when: not barman_node
+
+- name: Add user'barman' to master node
+  ansible.builtin.user:
+    name: barman
+    shell: /bin/bash
+  when: master_node
+
+#  Генерируем SSH-ключ для пользователя postgres на хосте node1
+- name: generate SSH key for postgres
+  user:
+    name: postgres
+    generate_ssh_key: true
+    ssh_key_type: rsa
+    ssh_key_bits: 4096
+    force: false
+  when: master_node
+
+#  Генерируем SSH-ключ для пользователя barman на хосте barman
+- name: generate SSH key for barman
+  user:
+    name: barman
+    # uid: 994
+    # shell: /bin/bash
+    generate_ssh_key: true
+    ssh_key_type: rsa
+    ssh_key_bits: 4096
+    force: false
+  when: barman_node
+
+#  Забираем содержимое открытого ключа postgres c хоста node1
+- name: fetch all public ssh keys node1
+  shell: cat /var/lib/pgsql/.ssh/id_rsa.pub
+  register: ssh_keys
+  when: master_node
+
+#  Копируем ключ с barman на node1
+- name: transfer public key to barman
+  delegate_to: "{{ barman_node_name }}"
+  authorized_key:
+    key: "{{ ssh_keys.stdout }}"
+    comment: "{{ansible_hostname}}"
+    user: barman
+  when: master_node
+
+#  Забираем содержимое открытого ключа barman c хоста barman 
+- name: fetch all public ssh keys barman
+  shell: cat /var/lib/barman/.ssh/id_rsa.pub
+  register: ssh_keys
+  when: barman_node
+
+#  Копируем ключ с node1 на barman
+- name: transfer public key to barman
+  delegate_to: "{{ barman_master_node }}"
+  authorized_key:
+    key: "{{ ssh_keys.stdout }}"
+    comment: "{{ansible_hostname}}"
+    user: postgres
+  when: barman_node
+
+#CREATE USER barman SUPERUSER;
+- name: Create barman user
+  become_user: postgres
+  postgresql_user:
+    name: barman
+    password: '{{ barman_user_password }}'
+    role_attr_flags: SUPERUSER 
+  ignore_errors: true
+  when: master_node
+
+  # Добавляем разрешения для поключения с хоста barman
+- name: Add permission for barman
+  lineinfile:
+    path: /var/lib/pgsql/14/data/pg_hba.conf
+    line: 'host    all   {{ barman_user }}    {{ barman_ip }}/32    scram-sha-256'
+  when: not barman_node
+
+# Добавляем разрешения для подключения с хоста barman
+- name: Add permission for barman
+  lineinfile:
+    path: /var/lib/pgsql/14/data/pg_hba.conf
+    line: 'host    replication   {{ barman_user }}    {{ barman_ip }}/32    scram-sha-256'
+  when: not barman_node
+
+# Перезагружаем службу postgresql-server
+- name: restart postgresql-server on node1
+  service: 
+    name: postgresql-14
+    state: restarted
+  when: master_node
+
+# Создаём БД otus;
+- name: Create DB for backup
+  become_user: postgres
+  postgresql_db:
+    name: otus
+    encoding: UTF-8
+    template: template0
+    state: present
+  when: master_node
+
+# Создаём таблицу test1 в БД otus;
+- name: Add tables to otus_backup
+  become_user: postgres
+  postgresql_table:
+    db: otus
+    name: test1
+    state: present
+  when: master_node
+
+# Копируем файл .pgpass
+- name: copy .pgpass
+  template:
+    src: .pgpass.j2
+    dest: /var/lib/barman/.pgpass
+    owner: barman
+    group: barman
+    mode: '0600'
+  when: barman_node
+
+# Копируем файл barman.conf
+- name: copy barman.conf
+  template:
+    src: barman.conf.j2
+    dest: /etc/barman.conf 
+    owner: barman
+    group: barman
+    mode: '0644'
+  when: barman_node
+
+- name: Ensure barman.d dir exist.
+  ansible.builtin.file:
+    path: /etc/barman.d
+    state: directory
+    owner: barman
+    group: barman
+    mode: '0755'
+  when: barman_node
+
+# Копируем файл node1.conf
+- name: copy node1.conf
+  template:
+    src: node1.conf.j2
+    dest: /etc/barman.d/node1.conf
+    owner: barman
+    group: barman
+    mode: '0644'
+  when: barman_node
+
+- name: "barman switch-wal {{ barman_master_node }}"
+  become_user: barman
+  shell: "barman switch-wal {{ barman_master_node }}"
+  when: barman_node
+
+- name: barman cron
+  become_user: barman
+  shell: barman cron
+  when: barman_node
+
