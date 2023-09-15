@@ -45,3 +45,5 @@ vagrant up
 ![grafana](./docs/grafana.png)    
 
 Алертинг перднастриавается для Телеграм. Необходимо только поменять креды на свои.    
+![grafana_alarm1](./docs/grafana_alarm1.png)    
+![grafana_alarm2](./docs/grafana_alarm2.png)    
